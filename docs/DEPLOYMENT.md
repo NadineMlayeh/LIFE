@@ -220,9 +220,25 @@ disk", in production.
 **The first request after a quiet day is slow.** Expected: Neon waking and a cold function
 start. Subsequent requests are normal.
 
+**The build fails with `prisma: command not found` (exit 127).** The build must run as an npm
+script, not as a bare shell command — npm puts `node_modules/.bin` on the PATH and a plain
+shell does not. It is the `vercel-build` script in `backend/package.json`, which Vercel picks
+up automatically.
+
 **The build fails on `prisma migrate deploy`.** Usually the unpooled connection string.
 Migrations want a direct connection; if it persists, set `DIRECT_URL` to the unpooled string
 and add `directUrl = env("DIRECT_URL")` to the datasource block in `schema.prisma`.
+
+**Every route 404s once deployed.** All paths are rewritten to `/api/<path>` so one catch-all
+function serves the API, and the handler strips that prefix before Express sees the request —
+Nest's routes are declared as `/auth/login`, not `/api/auth/login`. If you change the rewrite,
+change the prefix stripping in `api/[[...path]].ts` to match.
+
+**`npm warn allow-scripts` during install.** Vercel blocks package install scripts by default.
+Two of ours wanted them: Prisma's, which does not matter because `vercel-build` runs
+`prisma generate` explicitly, and `bcrypt`'s, which compiled a native binary. That is why the
+project uses **`bcryptjs`** — pure JavaScript, no build step, and it produces and verifies the
+same standard hashes, so nothing about existing passwords changes.
 
 ---
 

@@ -1,10 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "prisma generate && prisma migrate deploy && nest build",
   "functions": {
-    "api/index.ts": {
+    "api/[[...path]].ts": {
       "maxDuration": 30
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/$1" }]
 }

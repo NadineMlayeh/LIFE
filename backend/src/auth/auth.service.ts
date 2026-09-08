@@ -6,7 +6,18 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+/*
+  `bcryptjs`, not `bcrypt`.
+
+  The native `bcrypt` compiles a binary during install, and serverless hosts increasingly
+  refuse to run package install scripts — which turns a missing build step into a crash on
+  every login, at runtime, in production. The pure-JavaScript implementation has no build step
+  and cannot fail that way.
+
+  It is slower, which does not matter at this scale, and it produces and verifies the **same
+  standard bcrypt hashes** — so passwords created before this change still work.
+*/
+import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { BooksService } from '../books/books.service.js';
 import { MailService } from '../mail/mail.service.js';

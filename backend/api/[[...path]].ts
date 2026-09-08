@@ -47,6 +47,21 @@ async function bootstrap(): Promise<NestExpressApplication> {
 export default async function handler(req: Request, res: Response) {
   cached ??= bootstrap();
   const app = await cached;
-  // Hand the request to Nest's underlying Express instance and let it route as normal.
+
+  /*
+    Strip the `/api` prefix before Express sees the request.
+
+    Every path is rewritten to `/api/<path>` so that a single catch-all function handles the
+    whole API — but Nest's routes are declared without that prefix (`/auth/login`, not
+    `/api/auth/login`). Left in place, every request would 404.
+
+    A rewrite that collapsed to a fixed `/api` would be worse still: the original path would be
+    gone entirely and unrecoverable, so nothing could be routed at all.
+  */
+  if (req.url?.startsWith('/api')) {
+    req.url = req.url.slice(4) || '/';
+  }
+
+  // Hand it to Nest's underlying Express instance and let it route as normal.
   app.getHttpAdapter().getInstance()(req, res);
 }
