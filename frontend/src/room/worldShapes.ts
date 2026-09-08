@@ -3,6 +3,8 @@
 // decorative wall map seen from across a room, not an atlas, and hand-tuned polygons are the
 // only way to get recognisable landmasses with no external assets.
 
+import { COUNTRIES } from '../data/countries'
+
 export type Outline = [number, number][]
 
 const ll = (lon: number, lat: number): [number, number] => [
@@ -63,22 +65,10 @@ export const CONTINENTS: Outline[] = [
 ]
 
 /**
- * Approximate centroids for pinning visited countries. Only a working subset — an unknown
- * code simply gets no pin rather than a wrong one, which is the honest failure.
+ * Pin positions in the map's 0..1 space, derived from the country list rather than kept as a
+ * second hand-maintained table. An unknown code simply gets no pin, which is the honest
+ * failure for a retired or mistyped one.
  */
-export const COUNTRY_POINTS: Record<string, [number, number]> = {
-  TN: ll(9, 34), MA: ll(-6, 32), DZ: ll(3, 28), EG: ll(30, 27), ZA: ll(24, -29),
-  NG: ll(8, 9), KE: ll(38, 0), GH: ll(-1, 8), SN: ll(-14, 14), ET: ll(40, 9),
-  FR: ll(2, 46), ES: ll(-4, 40), PT: ll(-8, 39), IT: ll(12, 43), DE: ll(10, 51),
-  GB: ll(-2, 54), IE: ll(-8, 53), NL: ll(5, 52), BE: ll(4, 50), CH: ll(8, 47),
-  AT: ll(14, 47), PL: ll(19, 52), CZ: ll(15, 50), SE: ll(15, 62), NO: ll(9, 61),
-  FI: ll(26, 64), DK: ll(10, 56), GR: ll(22, 39), TR: ll(35, 39), RU: ll(60, 60),
-  UA: ll(32, 49), RO: ll(25, 46), HU: ll(20, 47), HR: ll(16, 45),
-  US: ll(-98, 39), CA: ll(-106, 56), MX: ll(-102, 23), BR: ll(-52, -10),
-  AR: ll(-64, -34), CL: ll(-71, -35), CO: ll(-74, 4), PE: ll(-76, -10),
-  CN: ll(105, 35), JP: ll(138, 36), KR: ll(128, 36), IN: ll(79, 22),
-  TH: ll(101, 15), VN: ll(108, 14), ID: ll(113, -1), MY: ll(102, 4),
-  PH: ll(122, 12), SG: ll(104, 1), AE: ll(54, 24), SA: ll(45, 24),
-  QA: ll(51, 25), JO: ll(36, 31), LB: ll(36, 34), IL: ll(35, 31),
-  AU: ll(134, -25), NZ: ll(174, -41),
-}
+export const COUNTRY_POINTS: Record<string, [number, number]> = Object.fromEntries(
+  COUNTRIES.map((country) => [country.code, ll(country.lon, country.lat)]),
+)

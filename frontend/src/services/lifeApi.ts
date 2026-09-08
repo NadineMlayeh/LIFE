@@ -2,8 +2,7 @@ import type {
   Book,
   BookDetail,
   Chapter,
-  Item,
-  ItemType,
+  Letter,
   Note,
   Photo,
   PrivacyEntityType,
@@ -40,7 +39,10 @@ export const booksApi = {
     const { data } = await api.post<Book>('/books', payload)
     return data
   },
-  async update(id: string, payload: { title?: string; icon?: string; isHidden?: boolean }) {
+  async update(
+    id: string,
+    payload: { title?: string; icon?: string; isHidden?: boolean; onShelf?: boolean },
+  ) {
     const { data } = await api.patch<Book>(`/books/${id}`, payload)
     return data
   },
@@ -54,7 +56,7 @@ export const chaptersApi = {
     const { data } = await api.post<Chapter>('/chapters', payload)
     return data
   },
-  async update(id: string, payload: { title?: string; order?: number }) {
+  async update(id: string, payload: { title?: string; order?: number; content?: string }) {
     const { data } = await api.patch<Chapter>(`/chapters/${id}`, payload)
     return data
   },
@@ -63,28 +65,6 @@ export const chaptersApi = {
   },
 }
 
-export const itemsApi = {
-  async create(payload: {
-    chapterId: string
-    type: ItemType
-    title: string
-    body?: string
-    itemDate?: string
-  }) {
-    const { data } = await api.post<Item>('/items', payload)
-    return data
-  },
-  async update(
-    id: string,
-    payload: { type?: ItemType; title?: string; body?: string; itemDate?: string },
-  ) {
-    const { data } = await api.patch<Item>(`/items/${id}`, payload)
-    return data
-  },
-  async remove(id: string) {
-    await api.delete(`/items/${id}`)
-  },
-}
 
 export const timelineApi = {
   async list(search?: string) {
@@ -183,12 +163,47 @@ export const shareLinksApi = {
     const { data } = await api.get<ShareLink[]>('/share-links')
     return data
   },
-  async create() {
-    const { data } = await api.post<ShareLink>('/share-links')
+  /** `lifespan` is a number of days as a string, or 'never' for a key meant to be posted. */
+  async create(lifespan: '7' | '30' | '365' | 'never' = '30') {
+    const { data } = await api.post<ShareLink>('/share-links', { lifespan })
     return data
   },
   async revoke(id: string) {
     await api.delete(`/share-links/${id}`)
+  },
+}
+
+export const mailboxApi = {
+  async inbox() {
+    const { data } = await api.get<Letter[]>('/mailbox/inbox')
+    return data
+  },
+  async sent() {
+    const { data } = await api.get<Letter[]>('/mailbox/sent')
+    return data
+  },
+  async unreadCount() {
+    const { data } = await api.get<{ count: number }>('/mailbox/unread-count')
+    return data.count
+  },
+  /** Checks a username can actually be written to, before the letter is sent. */
+  async findRecipient(username: string) {
+    const { data } = await api.get<{ found: boolean; username: string | null }>(
+      '/mailbox/recipient',
+      { params: { username } },
+    )
+    return data
+  },
+  async send(payload: { recipient: string; subject: string; body: string; enclose?: boolean }) {
+    const { data } = await api.post<Letter>('/mailbox', payload)
+    return data
+  },
+  async markRead(id: string) {
+    const { data } = await api.patch<Letter>(`/mailbox/${id}/read`)
+    return data
+  },
+  async remove(id: string) {
+    await api.delete(`/mailbox/${id}`)
   },
 }
 
@@ -206,6 +221,13 @@ export const sharedApi = {
 }
 
 export const privacyApi = {
+  /** Reads stored visibility for a set of entities. Anything absent is PRIVATE. */
+  async get(entityType: PrivacyEntityType, ids: string[]) {
+    const { data } = await api.get<Record<string, Visibility>>('/privacy', {
+      params: { entityType, ids: ids.join(',') },
+    })
+    return data
+  },
   async set(entityType: PrivacyEntityType, entityId: string, visibility: Visibility) {
     await api.put('/privacy', { entityType, entityId, visibility })
   },

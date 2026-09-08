@@ -1,16 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { SendLetterDto } from './dto/letter.dto.js';
 
-// Letters carry only the correspondent's email, never their user id or any of their content.
+// A letter carries only the correspondent's public handle — never their email, never their
+// user id, and nothing else of theirs.
 const LETTER_FIELDS = {
   id: true,
   subject: true,
   body: true,
+  shareToken: true,
   readAt: true,
   createdAt: true,
-  sender: { select: { email: true } },
-  recipient: { select: { email: true } },
+  sender: { select: { username: true } },
+  recipient: { select: { username: true } },
 } as const;
 
 @Injectable()
@@ -41,16 +44,16 @@ export class MailboxService {
   }
 
   async send(userId: string, dto: SendLetterDto) {
-    const recipient = await this.prisma.user.findUnique({
-      where: { email: dto.recipientEmail.toLowerCase() },
+    const recipient = await this.prisma.user.findFirst({
+      where: { usernameLower: dto.recipient.toLowerCase() },
       select: { id: true, emailVerified: true },
     });
 
-    // Deliberate trade-off: telling the sender the address is unknown reveals whether an
-    // email has a LIFE account. For a letter you expect to be delivered, silently dropping it
-    // is the worse failure. Revisit if LIFE ever opens up to strangers.
+    // Saying plainly that nobody holds this username is not a leak: a username is public by
+    // design, and you learn the same thing by trying to register it. Silently dropping a
+    // letter someone expects to be delivered is the far worse failure.
     if (!recipient || !recipient.emailVerified) {
-      throw new NotFoundException('No LIFE account with that email address');
+      throw new NotFoundException('Nobody here goes by that name');
     }
 
     if (recipient.id === userId) {
@@ -63,9 +66,39 @@ export class MailboxService {
         recipientId: recipient.id,
         subject: dto.subject,
         body: dto.body,
+        shareToken: dto.enclose ? await this.invitationToken(userId) : null,
       },
       select: LETTER_FIELDS,
     });
+  }
+
+  /**
+   * The token to enclose with a letter. Reuses the writer's newest live link rather than
+   * minting one per letter, so revoking a link closes every door at once instead of leaving
+   * a trail of forgotten ones open.
+   */
+  private async invitationToken(userId: string) {
+    const existing = await this.prisma.shareLink.findFirst({
+      where: { userId, revoked: false },
+      orderBy: { createdAt: 'desc' },
+      select: { token: true },
+    });
+    if (existing) return existing.token;
+
+    const created = await this.prisma.shareLink.create({
+      data: { userId, token: randomBytes(32).toString('hex') },
+      select: { token: true },
+    });
+    return created.token;
+  }
+
+  /** Whether a username belongs to somebody a letter can actually reach. */
+  async findRecipient(username: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { usernameLower: username.toLowerCase(), emailVerified: true },
+      select: { username: true },
+    });
+    return { found: Boolean(user), username: user?.username ?? null };
   }
 
   async markRead(userId: string, id: string) {

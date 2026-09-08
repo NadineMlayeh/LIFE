@@ -58,14 +58,13 @@ export class PrivacyService {
     switch (entityType) {
       case 'BOOK':
         return this.prisma.book.findFirst({ where: { id: entityId, userId }, select });
-      case 'TIMELINE_EVENT':
-        return this.prisma.timelineEvent.findFirst({ where: { id: entityId, userId }, select });
       case 'PHOTO':
         return this.prisma.photo.findFirst({ where: { id: entityId, userId }, select });
       // Whole-object switches. There is exactly one map and one identity record per user, so
       // the user's own id is the entity id and owning it is the whole check.
       case 'PROFILE':
       case 'MAP':
+      case 'TIMELINE':
         return entityId === userId ? { id: entityId } : null;
     }
   }

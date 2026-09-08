@@ -81,6 +81,7 @@ export function Bookshelf({
   position,
   rotation = [0, 0, 0],
   onOpenBook,
+  onOpenShelf,
   onFocus,
   onHoverBook,
 }: {
@@ -88,6 +89,7 @@ export function Bookshelf({
   position: [number, number, number]
   rotation?: [number, number, number]
   onOpenBook: (book: Book) => void
+  onOpenShelf: () => void
   onFocus: () => void
   onHoverBook: (title: string | null) => void
 }) {
@@ -123,13 +125,35 @@ export function Bookshelf({
     [],
   )
 
-  const laid = useMemo(() => layoutBooks(books), [books])
+  // Only the volumes the owner has chosen to display actually stand on the shelf.
+  const laid = useMemo(() => layoutBooks(books.filter((b) => b.onShelf)), [books])
   const shelfGap = (CASE_HEIGHT - BOARD) / SHELF_COUNT
 
   return (
     <group position={position} rotation={rotation}>
-      {/* back panel */}
-      <mesh position={[0, CASE_HEIGHT / 2, -SHELF_DEPTH / 2]} receiveShadow>
+      {/* Back panel. It also carries the fallback way into the library: it sits behind every
+          book, so a spine always wins the raycast, but bare shelf still opens the contents
+          page. Without this the case is only clickable where a book happens to stand — take
+          every volume off the shelf and the library becomes unreachable, with no way back in
+          to put one down again. */}
+      <mesh
+        position={[0, CASE_HEIGHT / 2, -SHELF_DEPTH / 2]}
+        receiveShadow
+        onPointerOver={(e) => {
+          e.stopPropagation()
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation()
+          document.body.style.cursor = 'auto'
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          document.body.style.cursor = 'auto'
+          onFocus()
+          onOpenShelf()
+        }}
+      >
         <boxGeometry args={[SHELF_WIDTH, CASE_HEIGHT, 0.03]} />
         <meshStandardMaterial
           map={panelMaps.map}

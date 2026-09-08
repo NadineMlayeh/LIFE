@@ -27,4 +27,8 @@ export class UpdateBookDto {
   @IsOptional()
   @IsBoolean()
   isHidden?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  onShelf?: boolean;
 }

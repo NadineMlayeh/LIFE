@@ -50,10 +50,7 @@ export class BooksService {
     const book = await this.prisma.book.findFirst({
       where: { id, userId },
       include: {
-        chapters: {
-          orderBy: { order: 'asc' },
-          include: { items: { orderBy: { createdAt: 'asc' } } },
-        },
+        chapters: { orderBy: { order: 'asc' } },
       },
     });
 

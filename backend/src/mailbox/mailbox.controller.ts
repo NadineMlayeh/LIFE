@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser, type RequestUser } from '../auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { SendLetterDto } from './dto/letter.dto.js';
@@ -22,6 +32,13 @@ export class MailboxController {
   @Get('unread-count')
   unreadCount(@CurrentUser() user: RequestUser) {
     return this.mailbox.unreadCount(user.id);
+  }
+
+  // Public handles only. Answering this reveals nothing that trying to write to the name
+  // would not already tell you.
+  @Get('recipient')
+  recipient(@Query('username') username: string) {
+    return this.mailbox.findRecipient(username ?? '');
   }
 
   @Post()

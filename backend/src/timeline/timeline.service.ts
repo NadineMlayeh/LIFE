@@ -27,13 +27,8 @@ export class TimelineService {
       include: { book: { select: { id: true, title: true, icon: true } } },
     });
 
-    const visibility = await this.privacy.getMap(
-      userId,
-      'TIMELINE_EVENT',
-      events.map((event) => event.id),
-    );
-
-    return events.map((event) => ({ ...event, visibility: visibility[event.id] }));
+    // No per-event visibility: the timeline is shared whole or not at all.
+    return events;
   }
 
   async findOne(userId: string, id: string) {

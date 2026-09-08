@@ -48,19 +48,38 @@ export function PhotoFrames({
   const giltFrame = useMemo(() => createGiltFrameTexture(1024, 720), [])
   const mount = useMemo(() => createMountTexture(3), [])
 
+  /*
+    A Texture holds an image uploaded to the GPU, and dropping the JavaScript reference does
+    not release it — only `dispose()` does. The frame reloads whenever a different photograph
+    is hung, so without this every re-hang left the previous one resident in video memory for
+    the life of the page.
+
+    The cleanup also covers the race where the effect re-runs before the load finishes: the
+    late arrival is disposed on the spot rather than being handed to a component that has
+    moved on.
+  */
   useEffect(() => {
     if (!featuredUrl) {
       setFeatured(null)
       return
     }
+
     let cancelled = false
+    let loaded: Texture | null = null
+
     new TextureLoader().load(featuredUrl, (texture) => {
-      if (cancelled) return
+      if (cancelled) {
+        texture.dispose()
+        return
+      }
       texture.colorSpace = SRGBColorSpace
+      loaded = texture
       setFeatured(texture)
     })
+
     return () => {
       cancelled = true
+      loaded?.dispose()
     }
   }, [featuredUrl])
 

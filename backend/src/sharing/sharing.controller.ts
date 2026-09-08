@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -11,6 +12,7 @@ import {
 import { CurrentUser, type RequestUser } from '../auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { StorageService } from '../storage/storage.service.js';
+import { CreateShareLinkDto } from './dto/share-link.dto.js';
 import { SharingService } from './sharing.service.js';
 
 @Controller('share-links')
@@ -24,8 +26,8 @@ export class ShareLinksController {
   }
 
   @Post()
-  create(@CurrentUser() user: RequestUser) {
-    return this.sharing.createLink(user.id);
+  create(@CurrentUser() user: RequestUser, @Body() dto: CreateShareLinkDto) {
+    return this.sharing.createLink(user.id, dto.lifespan ?? '30');
   }
 
   @Delete(':id')
@@ -51,7 +53,7 @@ export class SharedViewController {
   @Get(':token/photos/:photoId/file')
   async photo(@Param('token') token: string, @Param('photoId') photoId: string) {
     const photo = await this.sharing.getSharedPhoto(token, photoId);
-    const stream = this.storage.getFileStream(photo.storagePath);
+    const stream = await this.storage.getFileStream(photo.storagePath);
     if (!stream) throw new NotFoundException('Image file is missing from storage');
 
     return new StreamableFile(stream, { type: photo.mimeType });

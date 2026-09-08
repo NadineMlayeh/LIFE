@@ -1,32 +1,34 @@
 import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { AppLayout } from './components/AppLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { BookDetailPage } from './pages/BookDetailPage'
-import { BooksPage } from './pages/BooksPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { GalleryPage } from './pages/GalleryPage'
-import { LoginPage } from './pages/LoginPage'
-import { NotesPage } from './pages/NotesPage'
-import { ProfilePage } from './pages/ProfilePage'
-import { SharedViewPage } from './pages/SharedViewPage'
-import { SharingPage } from './pages/SharingPage'
-import { SignupPage } from './pages/SignupPage'
-import { TimelinePage } from './pages/TimelinePage'
+import { AuthDoors } from './pages/LoginPage'
+import { VisitPage } from './pages/VisitPage'
+import { PasswordPage } from './pages/PasswordPage'
 import { VerifyPage } from './pages/VerifyPage'
 
-// Three.js is ~360 KB gzipped. Only people who actually open the room should download it —
-// the plain UI stays light.
+// Three.js is ~360 KB gzipped, so it is kept out of the first load: the auth doors and a
+// share link's error page should not have to wait for it.
 const RoomPage = lazy(() => import('./pages/RoomPage').then((m) => ({ default: m.RoomPage })))
 
 function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
+      {/* Both doors are the SAME element type on purpose. Rendering <LoginPage/> and
+          <SignupPage/> made React unmount the whole tree and build a new one on every switch,
+          which is what made the card flash and reset. One element type means it reconciles
+          instead, and the card simply slides. */}
+      <Route path="/login" element={<AuthDoors />} />
+      <Route path="/signup" element={<AuthDoors />} />
       <Route path="/verify" element={<VerifyPage />} />
-      <Route path="/share/:token" element={<SharedViewPage />} />
-      {/* The room sits outside the plain-UI chrome — it is its own full-screen world. */}
+      {/* Both halves of a forgotten password. `/reset` is what the emailed link points at; the
+          page tells them apart by whether a token is present. */}
+      <Route path="/forgot" element={<PasswordPage />} />
+      <Route path="/reset" element={<PasswordPage />} />
+      {/* A share link opens the room itself, not a summary of it. */}
+      <Route path="/share/:token" element={<VisitPage />} />
+      {/* The room is the whole application. Sharing lives in the mirror and letters in the
+          letter box, so there is no settings page and no plain interface — the only thing in
+          the room's corner is the way out. */}
       <Route
         path="/room"
         element={
@@ -43,23 +45,8 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/books" element={<BooksPage />} />
-        <Route path="/books/:id" element={<BookDetailPage />} />
-        <Route path="/timeline" element={<TimelinePage />} />
-        <Route path="/gallery" element={<GalleryPage />} />
-        <Route path="/notes" element={<NotesPage />} />
-        <Route path="/sharing" element={<SharingPage />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Everything lives in the room. There is no plain interface to fall back to. */}
+      <Route path="*" element={<Navigate to="/room" replace />} />
     </Routes>
   )
 }

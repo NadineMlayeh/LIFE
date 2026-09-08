@@ -1,7 +1,25 @@
 node_modules/
 dist/
+build/
+
+# Secrets. `.env.example` is committed and documents every variable; the real files never are.
 .env
 .env.local
+.env.*.local
+
+# Photographs uploaded in development. Nobody else's copy of the repo wants them.
 uploads/
+
 *.log
 .DS_Store
+Thumbs.db
+
+# Vercel's local link to a deployment.
+.vercel
+
+# Internal working notes — the running record of decisions, rejected approaches and bug
+# post-mortems kept while building. Useful to have locally; not something a public repository
+# needs, in the same way a team's planning board is not part of its codebase.
+# (`docs/PAGE-TURN.md`, `docs/DEPLOYMENT.md` and the original spec ARE committed.)
+docs/PLAN.md
+docs/PROGRESS.md

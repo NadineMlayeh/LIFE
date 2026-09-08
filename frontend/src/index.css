@@ -166,14 +166,15 @@ body {
   /* A brass plate, used for the one primary action on a surface. */
   .brass-button {
     font-family: var(--serif);
-    font-size: 13px;
-    letter-spacing: 0.08em;
+    font-size: 11px;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
+    white-space: nowrap;
     color: #2E2413;
     background-image: linear-gradient(160deg, #E2C67E 0%, #C9A24A 42%, #A8863C 100%);
     border: 1px solid rgba(70, 52, 18, 0.45);
     border-radius: 2px;
-    padding: 9px 18px;
+    padding: 6px 12px;
     box-shadow: var(--lift-sm);
     transition: filter 180ms ease, transform 180ms ease;
   }
@@ -194,11 +195,11 @@ body {
   /* A quieter action: ink on paper, underlined on hover like a printed cross-reference. */
   .quiet-button {
     font-family: var(--serif);
-    font-size: 13px;
+    font-size: 12px;
     color: var(--ink-soft);
     background: transparent;
     border: 0;
-    padding: 8px 10px;
+    padding: 6px 8px;
     transition: color 160ms ease;
   }
 
@@ -218,4 +219,59 @@ body {
     border: 0;
     border-top: 3px double var(--rule-strong);
   }
+}
+
+/*
+  Chrome paints autofilled inputs with its own near-white background using a UA stylesheet that
+  ordinary rules cannot beat — which is why the dark glass fields on the auth screens rendered
+  as white slabs the moment a saved login was filled in.
+
+  The usual workaround (`box-shadow: 0 0 0 1000px <colour> inset`) paints over it, but only with
+  an opaque colour, which would destroy the transparency that makes the pane read as glass.
+  Chrome *animates* that background in, so postponing the transition indefinitely means it
+  never arrives and the field keeps its own translucent background. The text colour still has
+  to be forced separately, since `-webkit-text-fill-color` outranks `color`.
+*/
+.glass-field:-webkit-autofill,
+.glass-field:-webkit-autofill:hover,
+.glass-field:-webkit-autofill:focus,
+.glass-field:-webkit-autofill:active {
+  -webkit-text-fill-color: #f4e9d2;
+  caret-color: var(--brass-lit);
+  transition: background-color 600000s 0s;
+}
+
+/*
+  The browser's default scrollbar is a white gutter with a grey thumb, and on a sheet of aged
+  paper it reads as a strip of the browser showing through — the one place the illusion breaks
+  without anyone deciding it should. These are the paper's own colours instead: no track at all,
+  and a thumb the weight of a printed rule.
+
+  `scrollbar-width`/`scrollbar-color` cover Firefox; the `::-webkit-` rules cover Chrome and
+  Safari, which ignore the standard properties for anything but the simplest styling.
+*/
+.paper-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(122, 91, 38, 0.42) transparent;
+}
+
+.paper-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.paper-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.paper-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(122, 91, 38, 0.34);
+  border-radius: 6px;
+  /* A transparent border with background-clip keeps the thumb clear of the text it sits beside,
+     which is what stops it looking bolted on. */
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.paper-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(122, 91, 38, 0.55);
 }

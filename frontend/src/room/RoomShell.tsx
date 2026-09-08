@@ -70,6 +70,8 @@ export function RoomShell({
   onCurtainChange,
   lampOn,
   onToggleLamp,
+  onGoOutside,
+  onHover,
 }: {
   lighting: DayLighting
   /** 0 = drawn across the window, 1 = pushed fully to the sides. */
@@ -77,6 +79,8 @@ export function RoomShell({
   onCurtainChange: (value: number) => void
   lampOn: boolean
   onToggleLamp: () => void
+  onGoOutside: () => void
+  onHover: (label: string | null) => void
 }) {
   const floorMaps = useMemo(
     () =>
@@ -198,6 +202,8 @@ export function RoomShell({
         sky={sky}
         curtainOpen={curtainOpen}
         onCurtainChange={onCurtainChange}
+        onGoOutside={onGoOutside}
+        onHover={onHover}
       />
       <PendantLamp on={lampOn} />
       <LightSwitch on={lampOn} onToggle={onToggleLamp} />
@@ -418,11 +424,15 @@ function Window({
   sky,
   curtainOpen,
   onCurtainChange,
+  onGoOutside,
+  onHover,
 }: {
   lighting: DayLighting
   sky: CanvasTexture
   curtainOpen: number
   onCurtainChange: (value: number) => void
+  onGoOutside: () => void
+  onHover: (label: string | null) => void
 }) {
   const paintMaps = useMemo(
     () => createPaintedMaps({ seed: 29, color: '#F6EEE0', size: 256, repeat: 1 }),
@@ -453,8 +463,25 @@ function Window({
 
   return (
     <group position={[-HALF_W + 0.02, WIN.centerY, WIN.centerZ]} rotation={[0, Math.PI / 2, 0]}>
-      {/* the daylight itself */}
-      <mesh>
+      {/* The daylight itself, and the way out. Clicking the glass takes you outside — the
+          window has always been the room's one view of anywhere else, so it is the door. */}
+      <mesh
+        onPointerOver={(e) => {
+          e.stopPropagation()
+          onHover('Step outside')
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation()
+          onHover(null)
+          document.body.style.cursor = 'auto'
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          document.body.style.cursor = 'auto'
+          onGoOutside()
+        }}
+      >
         <planeGeometry args={[W, H]} />
         <meshBasicMaterial map={sky} toneMapped={false} />
       </mesh>

@@ -1,26 +1,14 @@
-export type ItemType =
-  | 'PERSON'
-  | 'PLACE'
-  | 'MEMORY'
-  | 'EVENT'
-  | 'ACHIEVEMENT'
-  | 'NOTE'
-  | 'FILE'
-  | 'PHOTO'
-  | 'CUSTOM'
-
 export type GoalStatus = 'PENDING' | 'ACHIEVED' | 'NOT_ACHIEVED' | 'RESCHEDULED'
 
 export type Visibility = 'PRIVATE' | 'SHARE_ONLY'
 
 export type PrivacyEntityType =
   | 'BOOK'
-  | 'TIMELINE_EVENT'
   | 'PHOTO'
-  | 'NOTE'
   /** Whole-object switches; their entityId is the user's own id. */
   | 'PROFILE'
   | 'MAP'
+  | 'TIMELINE'
 
 export interface Photo {
   id: string
@@ -30,6 +18,9 @@ export interface Photo {
   size: number
   caption: string | null
   visibility: Visibility
+  /** The one photograph that hangs in the room's wall frame. At most one is true. */
+  isFeatured: boolean
+  timelineEventId: string | null
   createdAt: string
 }
 
@@ -51,17 +42,9 @@ export interface Book {
   icon: string | null
   isCustom: boolean
   isHidden: boolean
+  onShelf: boolean
   visibility?: Visibility
   _count?: { chapters: number }
-}
-
-export interface Item {
-  id: string
-  chapterId: string
-  type: ItemType
-  title: string
-  body: string | null
-  itemDate: string | null
 }
 
 export interface Chapter {
@@ -69,7 +52,8 @@ export interface Chapter {
   bookId: string
   title: string
   order: number
-  items: Item[]
+  /** The chapter's page, written freely. There is no level below this. */
+  content: string | null
 }
 
 export interface BookDetail extends Book {
@@ -108,10 +92,27 @@ export interface ShareLink {
   id: string
   token: string
   createdAt: string
+  /** When the key stops working. `null` means never. */
+  expiresAt: string | null
   revoked: boolean
 }
 
+export interface Letter {
+  id: string
+  subject: string
+  body: string
+  /** A letter may enclose an invitation to the writer's room. Usually null. */
+  shareToken: string | null
+  readAt: string | null
+  createdAt: string
+  /** Correspondents are known by their public handle only — never an email address. */
+  sender: { username: string }
+  recipient: { username: string }
+}
+
 export interface SharedView {
+  /** Whose room this is. The public handle, never the email. */
+  owner: { username: string }
   profile: {
     fullName: string | null
     birthplace: string | null
@@ -125,13 +126,7 @@ export interface SharedView {
     chapters: {
       id: string
       title: string
-      items: {
-        id: string
-        type: ItemType
-        title: string
-        body: string | null
-        itemDate: string | null
-      }[]
+      content: string | null
     }[]
   }[]
   events: {
@@ -144,4 +139,8 @@ export interface SharedView {
     book: { id: string; title: string; icon: string | null } | null
   }[]
   photos: { id: string; caption: string | null; mimeType: string }[]
+  visitedCountries: VisitedCountry[]
+  /** Whether the map is shared at all — an empty list could also mean "shared but nowhere". */
+  mapShared: boolean
+  featuredPhoto: { id: string; caption: string | null; mimeType: string } | null
 }

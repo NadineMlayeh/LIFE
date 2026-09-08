@@ -24,12 +24,8 @@ export class GalleryController {
   constructor(private readonly gallery: GalleryService) {}
 
   @Get()
-  list(
-    @CurrentUser() user: RequestUser,
-    @Query('timelineEventId') timelineEventId?: string,
-    @Query('bookId') bookId?: string,
-  ) {
-    return this.gallery.list(user.id, timelineEventId, bookId);
+  list(@CurrentUser() user: RequestUser, @Query('timelineEventId') timelineEventId?: string) {
+    return this.gallery.list(user.id, timelineEventId);
   }
 
   @Get('featured')

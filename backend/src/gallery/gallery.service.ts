@@ -13,14 +13,12 @@ export class GalleryService {
     private readonly storage: StorageService,
   ) {}
 
-  async list(userId: string, timelineEventId?: string, bookId?: string) {
+  async list(userId: string, timelineEventId?: string) {
     return this.prisma.photo.findMany({
-      where: {
-        userId,
-        ...(timelineEventId ? { timelineEventId } : {}),
-        ...(bookId ? { bookId } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
+      where: { userId, ...(timelineEventId ? { timelineEventId } : {}) },
+      // Oldest first: an album is read forwards, and the earliest page should be the earliest
+      // photograph.
+      orderBy: { createdAt: 'asc' },
     });
   }
 
@@ -66,8 +64,6 @@ export class GalleryService {
         visibility: dto.visibility,
         isFeatured: dto.isFeatured,
         timelineEventId: dto.timelineEventId,
-        bookId: dto.bookId,
-        itemId: dto.itemId,
       },
     });
   }
@@ -90,22 +86,6 @@ export class GalleryService {
       });
       if (!event) throw new NotFoundException('Timeline event not found');
     }
-
-    if (dto.bookId) {
-      const book = await this.prisma.book.findFirst({
-        where: { id: dto.bookId, userId },
-        select: { id: true },
-      });
-      if (!book) throw new NotFoundException('Book not found');
-    }
-
-    if (dto.itemId) {
-      const item = await this.prisma.item.findFirst({
-        where: { id: dto.itemId, chapter: { book: { userId } } },
-        select: { id: true },
-      });
-      if (!item) throw new NotFoundException('Item not found');
-    }
   }
 
   async remove(userId: string, id: string) {
@@ -117,7 +97,7 @@ export class GalleryService {
 
   async getFile(userId: string, id: string) {
     const photo = await this.findOwned(userId, id);
-    const stream = this.storage.getFileStream(photo.storagePath);
+    const stream = await this.storage.getFileStream(photo.storagePath);
     if (!stream) throw new NotFoundException('Image file is missing from storage');
     return { stream, mimeType: photo.mimeType };
   }

@@ -9,11 +9,28 @@ export class MailService {
 
   constructor() {
     this.from = process.env.MAIL_FROM ?? 'LIFE <no-reply@life.local>';
+    /*
+      One transport, two very different jobs.
+
+      Locally this points at Mailpit, which accepts anything, needs no credentials and
+      delivers nothing — every message is caught and readable at localhost:8025. In production
+      it points at a real provider (Resend, Postmark, anything with SMTP) and needs to
+      authenticate, which is what `SMTP_USER` decides between here.
+
+      `ignoreTLS` is only safe for the local trap; against a real host the connection has to be
+      encrypted, since the password crosses it.
+    */
+    const user = process.env.SMTP_USER;
+    const authenticated = Boolean(user);
+
     this.transporter = createTransport({
       host: process.env.SMTP_HOST ?? 'localhost',
       port: Number(process.env.SMTP_PORT ?? 1025),
-      secure: false,
-      ignoreTLS: true,
+      secure: Number(process.env.SMTP_PORT ?? 1025) === 465,
+      ignoreTLS: !authenticated,
+      ...(authenticated
+        ? { auth: { user, pass: process.env.SMTP_PASS ?? '' } }
+        : {}),
     });
   }
 
@@ -41,5 +58,38 @@ export class MailService {
     });
 
     this.logger.log(`Verification email sent to ${to}`);
+  }
+
+  async sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject: 'Reset your LIFE password',
+      text: `Someone asked to reset the password on your LIFE account.
+
+Set a new one here:
+${resetUrl}
+
+This link expires in one hour and can be used once. If it was not you, ignore this email — nothing has changed.`,
+      html: `
+        <div style="font-family: system-ui, sans-serif; max-width: 480px; line-height: 1.6; color: #1c1917;">
+          <h1 style="font-size: 20px; margin-bottom: 16px;">Reset your password</h1>
+          <p style="margin: 0 0 24px;">Someone asked to reset the password on your LIFE account.</p>
+          <p style="margin: 0 0 24px;">
+            <a href="${resetUrl}"
+               style="display: inline-block; background: #1c1917; color: #fff; padding: 12px 20px; border-radius: 6px; text-decoration: none;">
+              Set a new password
+            </a>
+          </p>
+          <p style="margin: 0 0 8px; font-size: 13px; color: #78716c;">Or paste this link into your browser:</p>
+          <p style="margin: 0 0 24px; font-size: 13px; word-break: break-all; color: #78716c;">${resetUrl}</p>
+          <p style="font-size: 13px; color: #78716c;">This link expires in one hour and can be used once. If it was not you, ignore this email — nothing has changed.</p>
+        </div>
+      `,
+    });
+
+    // The address is deliberately not logged: a reset request is a sensitive event, and logs
+    // are the easiest place for one to leak.
+    this.logger.log('Password reset email sent');
   }
 }

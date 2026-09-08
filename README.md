@@ -1,79 +1,300 @@
 # LIFE
 
-A private, interactive web app representing a person's whole life — identity, memories,
-life categories ("books"), a timeline of past events and future goals, photos, and a
-map — as one connected world.
+**A private place to keep a life — entered through a room you can walk into.**
 
-Full product spec: see `LIFE_master_spec.md`.
+Most personal-archive software is a database with a form on top. LIFE is a Victorian study
+rendered in the browser, where every kind of record is an object you open: a bookshelf for your
+writing, a longcase clock for your timeline, a mirror for who you are, a map for where you have
+been, a frame for your photographs, and a post box outside for letters to other people.
 
-## Status
+Nothing is filed in a menu. You open the thing itself.
 
-**Phase 0 — Skeleton** (in progress): auth + empty authenticated dashboard, no room graphics yet.
+> **Live:** _add your deployed URL here_
+> **Tour:** the app introduces itself on first login, and the tour can be replayed any time.
+
+<!-- Add 2–3 screenshots here: the room, a paper panel open over it, and the login card. -->
+
+---
+
+## Contents
+
+- [The idea](#the-idea)
+- [Features](#features)
+- [Engineering worth a look](#engineering-worth-a-look)
+- [Stack](#stack)
+- [Architecture](#architecture)
+- [Running it locally](#running-it-locally)
+- [Deployment](#deployment)
+- [Documentation](#documentation)
+- [Status and limitations](#status-and-limitations)
+
+---
+
+## The idea
+
+A life is not a list of records, so it should not look like one. The whole design follows from
+that: the interface has **no navigation bar, no settings page and no dashboard**. There is a
+room, there are objects in it, and content opens as sheets of paper resting on top — the room
+stays visible behind, so you never leave the world you are in.
+
+The second idea is that **privacy is the default and is enforced on the server**. Data you have
+not shared is never sent to a browser at all — not sent and hidden, not sent and filtered.
+Never sent.
+
+---
+
+## Features
+
+### The room
+
+An interior generated **entirely from code**. No 3D models, no photographs of materials, no
+downloaded environment maps — every surface is procedurally drawn at load time.
+
+- **Time of day.** The room reads your own clock. Morning is cool and low, afternoon bright,
+  sunset amber, night blue with the lamp lit. No weather API — your evening looks like evening.
+- **Working curtains.** Drag one across and the room genuinely darkens; the daylight is a real
+  light source, not a picture.
+- **A light switch** for the pendant lamp.
+- **A swinging pendulum**, a mirror with live reflections, and a camera that drifts slightly
+  with your cursor so the space feels inhabited.
+- Clicking an object walks the camera toward it before its document opens.
+
+### The library — bookshelf
+
+Long-form writing, organised by subject.
+
+- **Books → chapters → free text.** A book is a subject ("Travels", "Family"); a chapter is a
+  page you write on. Deliberately only three levels deep.
+- **A physical shelf with a real limit.** Sixteen volumes stand on it; the rest live in the full
+  library, and you choose which are out.
+- The chosen books are **rendered on the 3D shelf**, sized and coloured from a hash of their id
+  so the arrangement never reshuffles.
+- Chapters autosave about a second after you stop typing.
+- Per-book privacy.
+
+### The timeline — longcase clock
+
+- Moments in order, as rungs on an engraved scale.
+- **The real elapsed time between entries is shown on the connectors** — "3 years, 2 months" —
+  so the shape of a life is legible at a glance.
+- **Goals** are dated forward and drawn hollow. When one comes due the timeline asks whether you
+  managed it, and records achieved, missed or rescheduled.
+- Search, and jump to a date.
+- Whole-timeline privacy: shared entire or not at all.
+
+### The mirror
+
+Three things you decide about yourself.
+
+- **Identity** — the plain record: name, date of birth, birthplace, nationality, languages, and
+  a **changeable, unique username**.
+- **Notebook** — private notes that are **always private**. There is no sharing control, and no
+  code path that could share one.
+- **Sharing link** — cut a key to your room, choose how long it lasts (a week, a month, a year,
+  or forever), copy it, revoke it.
+
+### The album — photo frame
+
+- A **bound album you leaf through**, two prints to a spread, held on the page by paper corners,
+  with a real page turn: one leaf lifts, swings on the spine and lands face-down.
+- Captions are **always editable** — click and type, no edit mode.
+- Per-photograph privacy.
+- One photograph is **hung in the room's wall frame** and is what a visitor sees first.
+- Images are **compressed in the browser** before upload.
+
+### The map
+
+- **All 197 countries**, searchable and grouped by region.
+- **Been** (filled pin) and **still to come** (hollow pin), each with a date and notes.
+- Pins appear on the wall map in the room as well as the paper chart.
+- Whole-map privacy.
+
+### Outside, and the post box
+
+- **The window is a door.** Click the glass and you step into the garden: a path, hedges, gate
+  piers, your own house with **your window lit if your lamp is on**, and a night sky with stars.
+- **A post box on a stand.** Its flag stands up when post is waiting, and letters are visible
+  inside it.
+- **Letters are addressed by username, never by email** — so you can be written to without
+  handing out your address. The name is checked as you type.
+- **An invitation can be enclosed with a letter**: tick a box and the server attaches a key to
+  your room, so the reader can let themselves in without anyone copying a link about.
+
+### Visiting
+
+- A share link opens **the room itself**, not a summary of it — the same objects, the same
+  documents, read-only.
+- **Objects the owner did not share simply do not open.** They are furniture.
+- The visitor's panels are separate read-only components rather than the owner's panels with a
+  flag, so there is no branch that could accidentally render an edit control.
+
+### Accounts
+
+- Email and password, **bcrypt** hashed, with **email verification** before first login.
+- Login by **either** username or email.
+- **Password reset** — single-use, one-hour token.
+- **Rate limiting** on every route that can be abused.
+- Usernames are unique, case-insensitively, and changeable.
+
+---
+
+## Engineering worth a look
+
+Six things that were not obvious, in case you are reading this as a reviewer.
+
+**1. Privacy is a database concern, not an interface one.**
+The shared view builds its payload from queries that only ask for rows marked shared. During
+review I found the timeline and profile were being fetched in full and *then* discarded if
+private — nothing leaked, but the guarantee was accidental rather than enforced. It now checks
+visibility first and never loads what it will not send.
+→ `backend/src/sharing/sharing.service.ts`
+
+**2. Every texture is generated, not downloaded.**
+Seeded noise → fractal noise → wood grain, plaster, velvet, paper, gilt. Normal maps are
+derived by running a Sobel filter over the height data. Roughly 1,500 lines, all cached by
+parameter.
+→ `frontend/src/room/textures.ts`
+
+**3. A page turn is a geometry problem, not an animation one.**
+A 180° rotation about an edge always ends up outside the box it started in — which is why every
+real flipbook is a two-page spread. Understanding that changed the fix from the animation to
+the layout. Built rather than installed, because the obvious library is unmaintained and
+declares its own dependency as `"latest"`.
+→ `frontend/src/components/paper/PageTurn.tsx`, written up in [PAGE-TURN.md](docs/PAGE-TURN.md)
+
+**4. Never add or remove lights at runtime.**
+Flicking the light switch froze the app for a second: changing the number of lights in a scene
+makes Three.js recompile every material's shader. The lamp is now always mounted and dimmed to
+zero.
+
+**5. The storage layer has one seam.**
+Local disk in development, S3-compatible object storage in production, chosen by one
+environment variable. This mattered more than expected: serverless hosting has no persistent
+filesystem, so local disk in production loses every upload *silently*.
+→ `backend/src/storage/storage.service.ts`
+
+**6. Three dependencies were rejected on inspection.**
+`@nestjs/throttler` (no NestJS 12 support), `react-pageflip` (unmaintained, no React 19, pins
+nothing), and Supabase (its free tier pauses the whole project after a week idle, which would
+break a demo link). Each was replaced with something written or chosen deliberately, and the
+reasoning is recorded.
+
+---
 
 ## Stack
 
-- Frontend: Vite + React + TypeScript + Tailwind CSS + React Router
-- Backend: NestJS + TypeScript + Prisma + PostgreSQL
-- Auth (dev): email/password, bcrypt + JWT, local only — swapped to Supabase Auth at deploy time
-- Storage (dev): local disk — swapped to Supabase Storage at deploy time
-- Local DB: PostgreSQL via Docker Compose
+**Frontend**
+React 19 · TypeScript · Vite · Three.js via React Three Fiber · Tailwind CSS v4 ·
+Motion · React Router · axios
 
-## Running locally
+**Backend**
+NestJS 12 · TypeScript (ESM) · Prisma 6 · PostgreSQL · Passport JWT · bcrypt · Nodemailer ·
+Helmet
 
-Prerequisites: Docker Desktop must be running before step 1.
+**Infrastructure**
+Vercel (frontend and serverless API) · Neon (Postgres) · Cloudflare R2 (object storage) ·
+Resend (email) · Docker Compose and Mailpit for local development
 
-Open three terminals in the project root (`Desktop/LIFE`).
+---
 
-### 1. Start the database
+## Architecture
 
 ```
+LIFE/
+├── backend/                  NestJS API
+│   ├── prisma/               Schema and migrations
+│   ├── api/index.ts          Serverless entry point
+│   └── src/
+│       ├── auth/             Signup, login, verification, reset, usernames
+│       ├── common/           Rate-limit guard
+│       ├── privacy/          The visibility model
+│       ├── sharing/          Share links and the visitor payload
+│       ├── storage/          Disk or object storage, one seam
+│       └── …                 books, chapters, timeline, gallery, map, notes, mailbox
+│
+└── frontend/src/
+    ├── room/                 The 3D world: scene, shell, objects, textures, outside
+    ├── components/paper/     Document panels and the page turn
+    ├── components/auth/      The Victorian entrance card
+    ├── pages/                Routed screens
+    ├── services/             Every API call, in one place
+    └── data/                 The country list
+```
+
+Each backend feature is a **controller** (URLs), a **service** (the work) and **DTOs** (the
+shape of what may be sent). A request passes the rate-limit guard, then the auth guard, then
+validation, before any code of ours runs.
+
+The 3D bundle is **code-split and lazy-loaded**, so the login screen never downloads a 3D
+engine it will not use.
+
+---
+
+## Running it locally
+
+**You need:** Node 20+, Docker.
+
+```bash
+git clone <your-repo-url> && cd LIFE
+
+# 1. Postgres and a mail trap
 docker compose up -d
-```
 
-This starts two containers:
-
-- **Postgres** on port **5433** (not the usual 5432, which is taken by a
-  PostgreSQL server already installed on this machine)
-- **Mailpit**, a local mail catcher — the app's emails do not leave your machine.
-  Read them at **http://localhost:8025**
-
-### 2. Backend — terminal 2
-
-```
+# 2. Backend
 cd backend
-npm run start:dev
-```
+cp .env.example .env          # works as-is for local development
+npm install
+npx prisma migrate deploy
+npm run start:dev             # http://localhost:3000
 
-Runs on http://localhost:3000
-
-First time on a new machine only: `cp .env.example .env` then `npx prisma migrate dev`.
-
-### 3. Frontend — terminal 3
-
-```
+# 3. Frontend (a second terminal)
 cd frontend
-npm run dev
+cp .env.example .env
+npm install
+npm run dev                   # http://localhost:5173
 ```
 
-Open http://localhost:5173
+Then register an account. **Verification email arrives at http://localhost:8025** — Mailpit
+catches all outgoing mail so nothing reaches a real inbox during development.
 
-## Signing up
+---
 
-Signup requires email verification. After submitting the form, open the
-Mailpit inbox at **http://localhost:8025**, open the "Verify your LIFE account"
-message, and click the link. Only then can you log in.
+## Deployment
 
-Emails are sent over SMTP to Mailpit in development. At deployment (Phase 6),
-only `MailService` changes — swap the transport for a real provider.
+Everything runs on permanently free tiers. Step-by-step instructions, every environment
+variable, and what to check when something is wrong: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
-## Stopping
+---
 
-- Frontend / backend: `Ctrl+C` in their terminals
-- Database: `docker compose stop` (keeps data) — `docker compose down -v` deletes all data
+## Documentation
 
-## Useful commands
+| Document | What is in it |
+|---|---|
+| **[UNDERSTANDING-LIFE.md](docs/UNDERSTANDING-LIFE.md)** | A full walk through the codebase in plain language — how the backend, the database, Three.js and the panels work, and why each decision was made |
+| **[PAGE-TURN.md](docs/PAGE-TURN.md)** | How a realistic page turn works, why flipbook sites are built the way they are, and how to do it in any framework |
+| **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Deploying free, and why each service was chosen |
+| **[LIFE_master_spec.md](docs/LIFE_master_spec.md)** | The original product specification |
 
-```
-cd backend && npx prisma studio      # browse the database in a GUI
-cd backend && npx prisma migrate dev # apply schema changes after editing prisma/schema.prisma
-```
+---
+
+## Status and limitations
+
+Honest about what this is: a **complete, working application** that has not yet been used by
+anyone but its author.
+
+**Known gaps, in the order I would close them:**
+
+- **No automated tests.** The most valuable would be on the privacy boundary — proving the
+  shared payload can never contain an unshared record.
+- **Rate-limit counters are per-instance.** They live in memory, so they reset on restart and
+  are not shared across instances. Fine for one small server; Redis is the fix.
+- **Tokens are kept in `localStorage`**, which is readable by any script on the page. An
+  httpOnly cookie is safer but needs CSRF handling across two domains. A deliberate trade,
+  not an oversight.
+- **No mobile version.** The room is desktop-only by design — squeezing a 3D space onto a phone
+  while still designing it would have compromised both. Mobile is intended as its own build.
+- **Expired verification and reset tokens are never swept.** Harmless, but untidy.
+
+---
+
+*Concept, specification and design direction by Nadine Mlayeh.*

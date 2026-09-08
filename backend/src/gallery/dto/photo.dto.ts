@@ -21,12 +21,4 @@ export class UpdatePhotoDto {
   @IsOptional()
   @IsUUID()
   timelineEventId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  bookId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  itemId?: string;
 }

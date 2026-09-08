@@ -1,9 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { getErrorMessage } from '../../services/apiError'
+import { useAuth } from '../../hooks/useAuth'
+import { getErrorMessage, getErrorStatus } from '../../services/apiError'
+import * as authService from '../../services/authService'
 import { profileApi } from '../../services/lifeApi'
 import type { Visibility } from '../../types'
 import { Field, PrivacySeal } from './fields'
 import { NotebookSection } from './NotebookSection'
+import { SharingSection } from './SharingSection'
 import { Panel } from './Panel'
 
 const EMPTY = {
@@ -18,7 +21,7 @@ const EMPTY = {
  * The identity record, set as a printed certificate rather than a settings form. Identity is
  * shared as a whole — one seal at the head of the document, not a switch per line.
  */
-type Section = 'identity' | 'notebook'
+type Section = 'identity' | 'notebook' | 'sharing'
 
 export function IdentityPanel({
   open,
@@ -87,8 +90,15 @@ export function IdentityPanel({
       open={open}
       onClose={onClose}
       subtitle="The mirror"
-      title={section === 'identity' ? 'Who I am' : 'My notebook'}
+      title={
+        section === 'identity'
+          ? 'Who I am'
+          : section === 'notebook'
+            ? 'My notebook'
+            : 'Sharing link'
+      }
       variant="sheet"
+      steady
       actions={
         section === 'identity' ? (
           <PrivacySeal
@@ -100,13 +110,15 @@ export function IdentityPanel({
         ) : null
       }
     >
-      {/* The mirror holds three things (spec C.1): identity, the notebook and the gallery.
-          The gallery has its own frame in the room, so it is a cross-reference here. */}
-      <nav className="mb-6 flex items-center gap-1 border-b border-[var(--rule)] pb-2">
+      {/* The mirror holds what you decide about yourself: the record, the notebook, and who
+          may come in. The gallery has its own frame in the room, so it is only a
+          cross-reference here. */}
+      <nav className="mb-5 flex items-center gap-1 border-b border-[var(--rule)] pb-2">
         {(
           [
             ['identity', 'Identity'],
             ['notebook', 'Notebook'],
+            ['sharing', 'Sharing link'],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -146,25 +158,27 @@ export function IdentityPanel({
         <NotebookSection active={open} />
       </div>
 
+      <div style={{ display: section === 'sharing' ? 'block' : 'none' }}>
+        <SharingSection active={open} />
+      </div>
+
+      {/* Six fields in three rows, so the whole record — and the button that saves it — sits
+          on one page. Stacked, it ran past the bottom of the sheet and Record had to be
+          scrolled to, which is the one control that must never be hidden. */}
       <div style={{ display: section === 'identity' ? 'block' : 'none' }}>
         {loading ? (
         <p className="py-10 text-center text-[var(--ink-faint)]">Opening…</p>
       ) : (
-        <form onSubmit={onSubmit} className="space-y-7">
+        <form onSubmit={onSubmit} className="space-y-4">
           {error && <p className="text-sm text-[var(--oxblood)]">{error}</p>}
 
-          <p className="text-[14px] leading-relaxed text-[var(--ink-soft)]">
-            The plain facts of a life, kept in one place. Every field is optional — this record
-            is yours to leave as blank or as full as you like.
-          </p>
-
-          <Field
-            label="Full name"
-            value={form.fullName}
-            onChange={(v) => setForm({ ...form, fullName: v })}
-          />
-
-          <div className="grid gap-7 sm:grid-cols-2">
+          <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
+            <HandleField />
+            <Field
+              label="Full name"
+              value={form.fullName}
+              onChange={(v) => setForm({ ...form, fullName: v })}
+            />
             <Field
               label="Date of birth"
               type="date"
@@ -189,8 +203,6 @@ export function IdentityPanel({
             />
           </div>
 
-          <div className="hairline" />
-
           <div className="flex items-center gap-4">
             <button type="submit" disabled={saving} className="brass-button">
               {saving ? 'Recording…' : 'Record'}
@@ -206,5 +218,90 @@ export function IdentityPanel({
         )}
       </div>
     </Panel>
+  )
+}
+
+
+/**
+ * The public handle, changed in place.
+ *
+ * It is not permanent — a name chosen years ago should not be a life sentence — but it is
+ * unique, so this checks before it saves and says plainly when the name has gone. The old
+ * handle is released the moment the new one is taken, which is the accepted cost of allowing
+ * renames at all.
+ */
+function HandleField() {
+  const { user, setUser } = useAuth()
+  const [value, setValue] = useState(user?.username ?? '')
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'taken' | 'bad' | 'failed'>(
+    'idle',
+  )
+
+  useEffect(() => {
+    if (user?.username) setValue(user.username)
+  }, [user?.username])
+
+  const changed = value.trim() !== (user?.username ?? '')
+  const shaped = /^[a-zA-Z][a-zA-Z0-9_]{2,23}$/.test(value.trim())
+
+  async function save() {
+    const next = value.trim()
+    if (!changed) return
+    if (!shaped) {
+      setState('bad')
+      return
+    }
+    setState('saving')
+    try {
+      const updated = await authService.changeUsername(next)
+      setUser(updated)
+      setState('saved')
+    } catch (err) {
+      setState(getErrorStatus(err) === 409 ? 'taken' : 'failed')
+    }
+  }
+
+  const note =
+    state === 'saving'
+      ? 'Saving…'
+      : state === 'saved'
+        ? 'Saved.'
+        : state === 'taken'
+          ? 'Someone already has that one.'
+          : state === 'bad'
+            ? 'Letters, numbers and underscores. Start with a letter, 3–24 long.'
+            : state === 'failed'
+              ? 'That did not save.'
+              : 'How others find you. Never your email.'
+
+  return (
+    <div>
+      <Field
+        label="Username"
+        value={value}
+        onChange={(v) => {
+          setValue(v)
+          setState('idle')
+        }}
+      />
+      <div className="mt-1 flex items-center gap-3">
+        <p
+          className="min-w-0 flex-1 text-[12px]"
+          style={{
+            color:
+              state === 'taken' || state === 'bad' || state === 'failed'
+                ? 'var(--oxblood)'
+                : 'var(--ink-faint)',
+          }}
+        >
+          {note}
+        </p>
+        {changed && (
+          <button type="button" onClick={save} className="quiet-button shrink-0 !p-0">
+            Change it
+          </button>
+        )}
+      </div>
+    </div>
   )
 }

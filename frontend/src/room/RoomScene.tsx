@@ -13,7 +13,15 @@ import { PALETTE } from './palette'
 import { RoomShell } from './RoomShell'
 import { lightingForDate, type DayLighting } from './timeOfDay'
 
-export type FocusTarget = 'overview' | 'bookshelf' | 'clock' | 'mirror' | 'map' | 'frames'
+export type FocusTarget =
+  | 'overview'
+  | 'bookshelf'
+  | 'clock'
+  | 'mirror'
+  | 'map'
+  | 'frames'
+  | 'window'
+  | 'switch'
 
 interface Shot {
   position: Vector3
@@ -34,6 +42,10 @@ const SHOTS: Record<FocusTarget, Shot> = {
   mirror: { position: new Vector3(-1.75, 1.5, -2.05), target: new Vector3(-3.5, 1.35, -2.1) },
   map: { position: new Vector3(-0.2, 1.74, -1.7), target: new Vector3(-0.2, 1.8, -3.35) },
   frames: { position: new Vector3(1.55, 1.8, -1.6), target: new Vector3(1.55, 1.92, -3.36) },
+  // The window is in the left-hand wall; stand back from it so both curtains are in shot.
+  window: { position: new Vector3(-1.15, 1.6, 0.15), target: new Vector3(-3.6, 1.5, 0.15) },
+  // The switch is a small thing, so this one goes closer than any other shot.
+  switch: { position: new Vector3(1.95, 1.42, -2.35), target: new Vector3(2.42, 1.3, -3.36) },
 }
 
 function CameraRig({ focus, parallax }: { focus: FocusTarget; parallax: boolean }) {
@@ -130,6 +142,7 @@ export function RoomScene({
   onOpenMap,
   onOpenIdentity,
   onOpenGallery,
+  onGoOutside,
   onHoverObject,
   paused = false,
 }: {
@@ -146,6 +159,8 @@ export function RoomScene({
   onOpenMap: () => void
   onOpenIdentity: () => void
   onOpenGallery: () => void
+  /** The window is the way out. The mailbox lives outside, where a mailbox belongs. */
+  onGoOutside: () => void
   onHoverObject: (label: string | null) => void
 }) {
   const lighting = useMemo(() => lightingForDate(), [])
@@ -207,6 +222,8 @@ export function RoomScene({
         onCurtainChange={setCurtainOpen}
         lampOn={lampOn}
         onToggleLamp={() => setLampOn((v) => !v)}
+        onGoOutside={onGoOutside}
+        onHover={onHoverObject}
       />
 
       {/* Arranged to the owner's mockup: shelf left, map centre, framed photo over the couch,
@@ -215,6 +232,7 @@ export function RoomScene({
         books={books}
         position={[-2.1, 0, -3.2]}
         onOpenBook={onOpenLibrary}
+        onOpenShelf={onOpenLibrary}
         onFocus={() => onFocus('bookshelf')}
         onHoverBook={onHoverObject}
       />

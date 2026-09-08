@@ -1,6 +1,6 @@
 import { IsEnum, IsUUID } from 'class-validator';
 
-// MAP and PROFILE are whole-object switches: there is one of each per user, and its
+// MAP, PROFILE and TIMELINE are whole-object switches: there is one of each per user, and its
 // `entityId` is the user's own id. Everything else is controlled per record.
 //
 // NOTE is deliberately absent. The notebook is always private — it is the one place in LIFE
@@ -8,10 +8,10 @@ import { IsEnum, IsUUID } from 'class-validator';
 // a control that happens to default to off.
 export const PRIVACY_ENTITY_TYPES = [
   'BOOK',
-  'TIMELINE_EVENT',
   'PHOTO',
   'PROFILE',
   'MAP',
+  'TIMELINE',
 ] as const;
 export type PrivacyEntityType = (typeof PRIVACY_ENTITY_TYPES)[number];
 

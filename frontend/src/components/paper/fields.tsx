@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from 'motion/react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import type { PrivacyEntityType, Visibility } from '../../types'
 import { privacyApi } from '../../services/lifeApi'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /** A label set above a ruled line, the way a printed form is laid out. */
 export function Field({
@@ -100,8 +101,11 @@ export function PrivacySeal({
 }) {
   const [visibility, setVisibility] = useState<Visibility>(value)
   const [saving, setSaving] = useState(false)
-  const [confirming, setConfirming] = useState(false)
+  const [anchor, setAnchor] = useState<DOMRect | null>(null)
+  const button = useRef<HTMLButtonElement>(null)
   const shared = visibility === 'SHARE_ONLY'
+
+  useEffect(() => setVisibility(value), [value])
 
   async function apply() {
     const next: Visibility = shared ? 'PRIVATE' : 'SHARE_ONLY'
@@ -110,60 +114,21 @@ export function PrivacySeal({
       await privacyApi.set(entityType, entityId, next)
       setVisibility(next)
       onChanged?.(next)
-      setConfirming(false)
+      setAnchor(null)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <span className="inline-flex flex-wrap items-center justify-end gap-2">
-      {/* Rendered inline rather than as a floating popover: the panel clips its own overflow
-          to keep its rounded corners, which swallowed the popover entirely. */}
-      <AnimatePresence>
-        {confirming && (
-          <motion.span
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 6 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
-            className="inline-flex items-center gap-2 rounded-[3px] border px-3 py-1.5"
-            style={{ borderColor: 'var(--rule)', backgroundColor: 'var(--paper-lit)' }}
-          >
-            <span className="max-w-[16rem] text-[12px] leading-snug text-[var(--ink-soft)]">
-              {shared
-                ? 'Hide this again? Link holders lose access.'
-                : 'Share this with anyone holding your link?'}
-            </span>
-            <button
-              type="button"
-              onClick={apply}
-              disabled={saving}
-              className="brass-button !px-3 !py-1 !text-[11px]"
-            >
-              {saving ? '…' : shared ? 'Hide' : 'Share'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              className="quiet-button !p-1 !text-[12px]"
-            >
-              No
-            </button>
-          </motion.span>
-        )}
-      </AnimatePresence>
-
+    <>
       <button
+        ref={button}
         type="button"
-        onClick={() => setConfirming((v) => !v)}
+        onClick={() => setAnchor(anchor ? null : (button.current?.getBoundingClientRect() ?? null))}
         disabled={saving}
-        title={
-          shared
-            ? 'Anyone with your share link can see this'
-            : 'Private — only you can see this'
-        }
-        className="group inline-flex items-center gap-2 rounded-full border px-3 py-1.5 transition disabled:opacity-60"
+        title={shared ? 'Anyone with your share link can see this' : 'Private — only you can see this'}
+        className="inline-flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1 transition disabled:opacity-60"
         style={{
           borderColor: shared ? 'rgba(168,134,60,0.7)' : 'var(--rule)',
           backgroundColor: shared ? 'rgba(201,162,74,0.16)' : 'transparent',
@@ -173,7 +138,7 @@ export function PrivacySeal({
           aria-hidden
           animate={{ rotate: shared ? 0 : -14, scale: shared ? 1 : 0.94 }}
           transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-          className="inline-block h-3 w-3 rounded-full"
+          className="inline-block h-2.5 w-2.5 rounded-full"
           style={{
             background: shared
               ? 'radial-gradient(circle at 32% 30%, #E2C67E, #A8863C 70%)'
@@ -182,13 +147,178 @@ export function PrivacySeal({
           }}
         />
         <span
-          className="text-[11px] uppercase tracking-[0.14em]"
+          className="text-[10px] uppercase tracking-[0.14em]"
           style={{ color: shared ? '#7A5F1E' : 'var(--ink-soft)' }}
         >
           {label ? `${label} · ` : ''}
           {shared ? 'Shared' : 'Private'}
         </span>
       </button>
-    </span>
+
+      <ConfirmBubble
+        anchor={anchor}
+        onDismiss={() => setAnchor(null)}
+        question={
+          shared
+            ? 'Make this private again? Anyone holding your link loses access.'
+            : 'Share this with anyone holding your link?'
+        }
+        confirmLabel={shared ? 'Make private' : 'Share it'}
+        busy={saving}
+        onConfirm={apply}
+      />
+    </>
+  )
+}
+
+/**
+ * A confirmation bubble rendered through a portal, anchored under whatever opened it.
+ *
+ * Two earlier attempts failed for opposite reasons: a popover inside the panel was clipped
+ * away by the panel's `overflow-hidden`, and an inline strip pushed every neighbouring
+ * element sideways. A portal escapes the clipping *and* takes no space in the layout.
+ */
+export function ConfirmBubble({
+  anchor,
+  question,
+  confirmLabel,
+  busy,
+  onConfirm,
+  onDismiss,
+}: {
+  anchor: DOMRect | null
+  question: string
+  confirmLabel: string
+  busy?: boolean
+  onConfirm: () => void
+  onDismiss: () => void
+}) {
+  useEffect(() => {
+    if (!anchor) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onDismiss()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [anchor, onDismiss])
+
+  if (typeof document === 'undefined') return null
+
+  const WIDTH = 250
+  // Kept on screen when the anchor sits near the right edge.
+  const left = anchor
+    ? Math.min(Math.max(12, anchor.right - WIDTH), window.innerWidth - WIDTH - 12)
+    : 0
+
+  return createPortal(
+    <AnimatePresence>
+      {anchor && (
+        <>
+          <motion.div
+            className="fixed inset-0 z-[60]"
+            style={{ backdropFilter: 'blur(2px)', backgroundColor: 'rgba(44,32,18,0.18)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.14 }}
+            onClick={onDismiss}
+          />
+          <motion.div
+            role="dialog"
+            className="fixed z-[61] rounded-[3px] border p-3"
+            style={{
+              top: anchor.bottom + 8,
+              left,
+              width: WIDTH,
+              borderColor: 'var(--rule)',
+              backgroundColor: 'var(--paper-lit)',
+              boxShadow: 'var(--lift-md)',
+            }}
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+          >
+            <p className="mb-2.5 text-[13px] leading-snug text-[var(--ink)]">{question}</p>
+            <div className="flex items-center gap-2">
+              <button onClick={onConfirm} disabled={busy} className="brass-button">
+                {busy ? '…' : confirmLabel}
+              </button>
+              <button onClick={onDismiss} className="quiet-button">
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body,
+  )
+}
+
+/**
+ * A small explicative bubble shown while the pointer rests on a control, for buttons whose
+ * label cannot carry the whole meaning on its own — "Put away" and "Shelve" both move a book,
+ * and only a sentence makes clear which direction.
+ *
+ * Portalled for the same reason as {@link ConfirmBubble}: the panel clips its own overflow,
+ * so anything anchored to a control near the edge would otherwise be cut off. It also opens
+ * on focus, so the explanation is reachable from the keyboard rather than the mouse alone.
+ */
+export function Hint({ text, children }: { text: string; children: ReactNode }) {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null)
+  const ref = useRef<HTMLSpanElement>(null)
+
+  const show = () => setAnchor(ref.current?.getBoundingClientRect() ?? null)
+  const hide = () => setAnchor(null)
+
+  const WIDTH = 190
+  // Centred under the control, then pulled back inside the viewport at either edge.
+  const left = anchor
+    ? Math.min(
+        Math.max(10, anchor.left + anchor.width / 2 - WIDTH / 2),
+        window.innerWidth - WIDTH - 10,
+      )
+    : 0
+
+  return (
+    <>
+      <span
+        ref={ref}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+        className="inline-flex"
+      >
+        {children}
+      </span>
+
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {anchor && (
+              <motion.span
+                role="tooltip"
+                className="pointer-events-none fixed z-[70] block rounded-[3px] border px-2.5 py-1.5 text-[12px] leading-snug"
+                style={{
+                  top: anchor.bottom + 7,
+                  left,
+                  width: WIDTH,
+                  borderColor: 'var(--rule)',
+                  backgroundColor: 'var(--paper-lit)',
+                  color: 'var(--ink-soft)',
+                  boxShadow: 'var(--lift-md)',
+                }}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -3 }}
+                transition={{ duration: 0.14, ease: 'easeOut' }}
+              >
+                {text}
+              </motion.span>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+    </>
   )
 }

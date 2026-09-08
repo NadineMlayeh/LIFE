@@ -3,9 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module.js';
 import { BooksModule } from './books/books.module.js';
 import { ChaptersModule } from './chapters/chapters.module.js';
-import { FilesModule } from './files/files.module.js';
 import { GalleryModule } from './gallery/gallery.module.js';
-import { ItemsModule } from './items/items.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { MailboxModule } from './mailbox/mailbox.module.js';
 import { MapModule } from './map/map.module.js';
@@ -28,11 +26,9 @@ import { TimelineModule } from './timeline/timeline.module.js';
     ProfilesModule,
     BooksModule,
     ChaptersModule,
-    ItemsModule,
     TimelineModule,
     NotesModule,
     GalleryModule,
-    FilesModule,
     MapModule,
     MailboxModule,
     SharingModule,
