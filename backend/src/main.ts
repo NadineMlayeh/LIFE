@@ -1,21 +1,15 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { RateLimitGuard } from './common/rate-limit.guard.js';
+import { securityHeaders } from './common/security-headers.js';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  /*
-    Security headers, before anything else.
-
-    `crossOriginResourcePolicy` is turned off deliberately: photos are served from this API and
-    displayed by the frontend, which is a different origin in production. Helmet's default of
-    `same-origin` would block every image in the gallery.
-  */
-  app.use(helmet({ crossOriginResourcePolicy: false }));
+  // Security headers, before anything else.
+  app.use(securityHeaders);
 
   /*
     Behind a proxy — Vercel, Render, any CDN — the socket address is the proxy's, not the

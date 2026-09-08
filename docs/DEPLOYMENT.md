@@ -234,6 +234,13 @@ function serves the API, and the handler strips that prefix before Express sees 
 Nest's routes are declared as `/auth/login`, not `/api/auth/login`. If you change the rewrite,
 change the prefix stripping in `api/[[...path]].ts` to match.
 
+**A TypeScript error on the host that does not happen locally.** Almost always CommonJS/ESM
+interop: a package published as CommonJS with a single callable export compiles under one set
+of interop settings and not another, and the host's may differ from yours. `helmet` failed this
+way ("this expression is not callable") and was replaced with a few explicit headers in
+`common/security-headers.ts` — most of what it does is for HTML pages, and this server serves
+none.
+
 **`npm warn allow-scripts` during install.** Vercel blocks package install scripts by default.
 Two of ours wanted them: Prisma's, which does not matter because `vercel-build` runs
 `prisma generate` explicitly, and `bcrypt`'s, which compiled a native binary. That is why the

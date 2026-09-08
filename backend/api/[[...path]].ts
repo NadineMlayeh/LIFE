@@ -2,9 +2,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
-import helmet from 'helmet';
 import { AppModule } from '../src/app.module.js';
 import { RateLimitGuard } from '../src/common/rate-limit.guard.js';
+import { securityHeaders } from '../src/common/security-headers.js';
 
 /**
  * The serverless entry point.
@@ -34,7 +34,7 @@ async function bootstrap(): Promise<NestExpressApplication> {
     logger: ['error', 'warn'],
   });
 
-  app.use(helmet({ crossOriginResourcePolicy: false }));
+  app.use(securityHeaders);
   app.set('trust proxy', 1);
   app.enableCors({ origin: process.env.FRONTEND_URL ?? 'http://localhost:5173' });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

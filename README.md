@@ -190,8 +190,7 @@ React 19 · TypeScript · Vite · Three.js via React Three Fiber · Tailwind CSS
 Motion · React Router · axios
 
 **Backend**
-NestJS 12 · TypeScript (ESM) · Prisma 6 · PostgreSQL · Passport JWT · bcrypt · Nodemailer ·
-Helmet
+NestJS 12 · TypeScript (ESM) · Prisma 6 · PostgreSQL · Passport JWT · bcryptjs · Nodemailer
 
 **Infrastructure**
 Vercel (frontend and serverless API) · Neon (Postgres) · Resend (email) ·
