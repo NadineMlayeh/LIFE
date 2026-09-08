@@ -48,25 +48,36 @@ export default async function handler(req: Request, res: Response) {
   cached ??= bootstrap();
   const app = await cached;
 
-  /*
-    Strip the `/api` prefix before Express sees the request.
-
-    The filename matters: `[...path]` is a catch-all and matches any depth. `[[...path]]` is a
-    Next.js convention that a plain Vercel function does not recognise — it was read as a single
-    dynamic segment, so `/books` reached the app and `/auth/login` returned a 404 from the
-    platform. One-segment routes working while two-segment ones do not is the signature of it.
-
-    Every path is rewritten to `/api/<path>` so that a single catch-all function handles the
-    whole API — but Nest's routes are declared without that prefix (`/auth/login`, not
-    `/api/auth/login`). Left in place, every request would 404.
-
-    A rewrite that collapsed to a fixed `/api` would be worse still: the original path would be
-    gone entirely and unrecoverable, so nothing could be routed at all.
-  */
-  if (req.url?.startsWith('/api')) {
-    req.url = req.url.slice(4) || '/';
-  }
+  restoreOriginalPath(req);
 
   // Hand it to Nest's underlying Express instance and let it route as normal.
   app.getHttpAdapter().getInstance()(req, res);
+}
+
+/**
+ * Puts the path the caller actually asked for back on the request.
+ *
+ * Every request is rewritten to `/api?__path=<original>` so that one plain function serves the
+ * whole API. Nest's routes are declared without any prefix (`/auth/login`), so the original
+ * path has to be restored before Express sees it or nothing matches.
+ *
+ * **Why a query parameter rather than a catch-all file.** Vercel's bracket filenames are a
+ * convention, and this project got burnt by it: `[...path]` was read as a dynamic segment
+ * *named* `...path` rather than as a catch-all, so one-segment routes reached the app and
+ * everything deeper returned a platform 404 — `/books` answered while `/auth/login` did not.
+ * Carrying the path in a parameter we set and read ourselves depends on no convention at all.
+ */
+function restoreOriginalPath(req: Request) {
+  const [, rawQuery = ''] = (req.url ?? '').split('?');
+  const params = new URLSearchParams(rawQuery);
+
+  const original = params.get('__path');
+  if (original === null) return;
+
+  // Anything else on the query belongs to the caller and must survive.
+  params.delete('__path');
+  const rest = params.toString();
+
+  const path = original.startsWith('/') ? original : `/${original}`;
+  req.url = rest ? `${path}?${rest}` : path;
 }
