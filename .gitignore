@@ -2,6 +2,10 @@ node_modules/
 dist/
 build/
 
+# TypeScript's incremental-build cache. Machine-specific, changes on every build, and useless
+# to anyone else.
+*.tsbuildinfo
+
 # Secrets. `.env.example` is committed and documents every variable; the real files never are.
 .env
 .env.local
