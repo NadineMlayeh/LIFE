@@ -212,6 +212,19 @@ frontend's origin. No trailing slash.
 **Emails never arrive.** Without a verified domain Resend only delivers to your own address.
 Check Resend's dashboard — it logs every attempt and why it failed.
 
+**Emails land in spam.** Expected, and not a misconfiguration. `onboarding@resend.dev` is a
+shared sandbox sender used by thousands of developers, so it carries no sending reputation of
+its own, and mailbox providers treat it accordingly.
+
+The only real fix is **your own domain, verified in Resend**, which publishes SPF and DKIM
+records saying the mail is genuinely from you. A domain is around £10 a year and is worth it
+for a second reason: `life.yourname.com` reads considerably better on a CV than
+`life-app-sage.vercel.app`.
+
+Until then the app says so plainly — the screen after signing up tells people to look in spam,
+as does the resend notice and the password-reset screen. That costs nothing and saves the
+confusion of a letter that appears not to have arrived.
+
 **Photographs vanish after upload.** Neither `S3_BUCKET` nor `STORE_FILES_IN_DB` is set, so the
 API fell back to local disk and the file went to a machine that no longer exists. The API's
 startup log says which backend it chose — check it says "bucket" or "database", never "local

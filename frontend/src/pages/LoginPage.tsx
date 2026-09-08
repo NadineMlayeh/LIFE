@@ -461,7 +461,7 @@ function LetterSent({ email }: { email: string }) {
         . Open it to unlock the door.
       </p>
       <p className="mt-2 text-[12px]" style={{ color: "#A8916B" }}>
-        It keeps for twenty-four hours.
+        It keeps for twenty-four hours &mdash; and it often lands in spam, so look there too.
       </p>
 
       {notice && (

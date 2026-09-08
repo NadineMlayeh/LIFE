@@ -65,7 +65,8 @@ function AskForLink() {
       <div className="text-center">
         <Notice tone="ok">{sent}</Notice>
         <p className="mt-4 text-[13px] leading-relaxed" style={{ color: '#A8916B' }}>
-          The link works once and lapses after an hour.
+          The link works once and lapses after an hour. If it is not in your inbox, look in
+          spam.
         </p>
       </div>
     )
