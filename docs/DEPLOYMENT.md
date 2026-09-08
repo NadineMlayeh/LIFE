@@ -17,8 +17,8 @@ free plans these services actually intend people to stay on.
 
 ### Why Neon and not Supabase
 
-This is the decision worth understanding, because it is the difference between a link that
-works and a link that embarrasses you.
+This is the decision that matters most, because it determines whether the deployed link works
+when someone finally clicks it.
 
 **Supabase's free tier pauses the entire project after a week of inactivity**, and it needs a
 manual click in the dashboard to come back. For an app you show people occasionally — a link in
@@ -28,8 +28,8 @@ a CV, a post someone reads a month later — that means it is *broken every time
 on the next query, typically in under half a second. The first visitor after a quiet week waits
 an extra moment. Nobody has to unpause anything.
 
-Both are excellent; they simply optimise for different things. For a portfolio piece that sits
-untouched between viewings, Neon's behaviour is the one you want.
+Both are excellent; they simply optimise for different things. For an application that sits
+untouched between visits, Neon's behaviour is the one that suits.
 
 ### Why the API is a function, not a server
 
@@ -96,17 +96,15 @@ ever saw it keeps access forever, whatever you later decide.
 
 Set `STORE_FILES_IN_DB=true` and leave `S3_BUCKET` empty. That is the whole setup.
 
-Files in a database is not what you would choose given a free hand — it makes backups larger
-and reads heavier than a bucket would. But at this scale it is entirely workable, and being
-able to deploy at all beats a purer architecture you cannot reach. Photographs are compressed
-in the browser to roughly 300 KB, so Neon's free 0.5 GB holds **about 1,500 of them**.
+Files in a database are not the ideal arrangement: backups grow larger and reads are heavier
+than they would be against a bucket. At this scale it is nonetheless entirely workable, and a
+deployment that exists beats a purer architecture that cannot be reached. Photographs are
+compressed in the browser to roughly 300 KB, so Neon's free 0.5 GB holds **about 1,500 of
+them**.
 
-If you later add a bucket, set the `S3_*` variables and turn this off. Existing photographs
-would need copying across, but nothing in the code changes.
-
-**Be able to explain this one.** "Why are you storing blobs in Postgres?" is a fair question,
-and the answer — *object storage is correct, the free tiers all require a card, the storage
-layer has one seam so moving is a config change* — shows you knew the trade you were making.
+Adding a bucket later means setting the `S3_*` variables and turning this off. Existing
+photographs would have to be copied across, but no application code changes — the storage layer
+has a single seam, and which side of it is in use is decided entirely by configuration.
 
 ---
 
@@ -216,14 +214,13 @@ Check Resend's dashboard — it logs every attempt and why it failed.
 shared sandbox sender used by thousands of developers, so it carries no sending reputation of
 its own, and mailbox providers treat it accordingly.
 
-The only real fix is **your own domain, verified in Resend**, which publishes SPF and DKIM
-records saying the mail is genuinely from you. A domain is around £10 a year and is worth it
-for a second reason: `life.yourname.com` reads considerably better on a CV than
-`life-app-sage.vercel.app`.
+The fix is a **verified domain in Resend**, which publishes the SPF and DKIM records that
+prove the mail genuinely originates where it claims to. A custom domain also gives the
+application a better address than the host's generated one.
 
-Until then the app says so plainly — the screen after signing up tells people to look in spam,
-as does the resend notice and the password-reset screen. That costs nothing and saves the
-confusion of a letter that appears not to have arrived.
+Until then the interface says so plainly: the screen shown after signing up directs people to
+their spam folder, as do the resend notice and the password-reset screen. A letter that appears
+not to have arrived is worth a sentence rather than a silence.
 
 **Photographs vanish after upload.** Neither `S3_BUCKET` nor `STORE_FILES_IN_DB` is set, so the
 API fell back to local disk and the file went to a machine that no longer exists. The API's

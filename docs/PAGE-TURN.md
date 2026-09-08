@@ -29,7 +29,7 @@ Turning a page means: **tilt the rectangle around one of its edges, like a door 
 hinge.** That is the entire trick. Everything else — shadows, timing, a blank back side — is
 decoration on top of a swinging door.
 
-### Why I did not use the ready-made library
+### Why the ready-made library was not used
 
 `react-pageflip` was the obvious choice. Three things made it a bad bet:
 
@@ -39,7 +39,7 @@ maintaining it. It might work. "Might" is the problem.
 
 **It does not pin its own ingredient.** A package lists what it needs. This one says it needs
 `page-flip` at version `"latest"` — meaning _whatever the newest version is at the moment you
-install_. So you and I could install the same library on the same day and get different code.
+install_. Two installs of the same library on the same day can therefore yield different code.
 Worse, your project could build fine today and break in six months without you changing a
 single line. That is genuinely dangerous in something you want to still work in a year.
 
@@ -55,9 +55,9 @@ A library like StPageFlip works differently. You hand it a container and it says
 it moves elements around, clones them, rebuilds them when the page count changes, positions
 them absolutely. It also keeps a mental model, and it also trusts it.
 
-Two owners, two models, one set of elements. They disagree, and when they do you get bugs that
-are miserable to debug: a text box that loses what you typed, a button that stops responding,
-a page that renders twice.
+Two owners, two models, one set of elements. They disagree, and the resulting bugs are
+miserable to diagnose: a text box that loses what was typed, a button that stops responding, a
+page that renders twice.
 
 **This matters more for us than for a catalogue**, and here is the difference. A Monoprix
 catalogue is _dead pages_ — pictures that never change. Handing dead pictures to a library is
@@ -71,7 +71,7 @@ Every one of those is React needing to update an element that the flip library t
 That is the fight. It is not that the library is bad; it is that it was built for a slideshow
 of images and we have a live document.
 
-### How I built ours instead
+### How this one is built instead
 
 The key realisation: **in a real book, only one page moves.**
 
@@ -84,8 +84,8 @@ So:
 1. **The new page is rendered normally.** Plain React, sitting in the layout exactly as it
    would if there were no animation at all. This is why nothing broke — React still owns it,
    the text boxes still work, no library is involved.
-2. **The old page is photocopied.** When the page changes, I keep a copy of what was just on
-   screen, lay it on top, and swing _that_ away like a door on a hinge.
+2. **The old page is photocopied.** When the page changes, a copy of what was just on screen
+   is laid on top, and _that_ is swung away like a door on a hinge.
 3. **When the swing finishes, the copy is thrown away.**
 
 That is it. React never loses ownership of anything real. The only thing being animated is a
@@ -99,7 +99,7 @@ Two smaller touches do most of the convincing:
   lands. This does more work than the rotation itself, because a shadow implies a light in the
   room and the rotation alone does not. Remove the shadow and it stops looking like paper.
 
-### Why ours is not as good as Monoprix's
+### Where this falls short of the catalogue
 
 Two honest reasons.
 
@@ -108,15 +108,15 @@ Two honest reasons.
 Watch the catalogue closely: as the page lifts, it _curves_ — the paper bows like a real sheet
 being picked up. CSS cannot do that. CSS can move, rotate, scale and slant a flat rectangle,
 but it cannot bend one; a straight line stays straight, always. That is a hard limit of the
-technology, not something I skipped.
+technology, not a corner cut here.
 
-To bend a page you have to stop treating it as HTML and start _drawing_ it — chop it into
-strips on a `<canvas>` and paint each strip at a slightly different angle so the whole reads as
-a curve. FlipHTML5 does exactly this. But once a page is painted onto a canvas it is a picture:
-you cannot type in it, click a link in it, or select its text. Fine for a catalogue. Fatal for
-a photo album where captions are edited in place.
+Bending a page means no longer treating it as HTML and instead _drawing_ it — chopping it into
+strips on a `<canvas>` and painting each strip at a slightly different angle so the whole reads
+as a curve. FlipHTML5 does exactly this. But a page painted onto a canvas is a picture: nothing
+in it can be typed into, clicked, or selected. Fine for a catalogue. Fatal for a photo album
+whose captions are edited in place.
 
-So it is a real trade: **their curl, or our live pages. You cannot have both.**
+It is a genuine trade: **the curl, or live pages. Not both.**
 
 **2. There is no drag.**
 
@@ -132,9 +132,8 @@ second half of every swing happened off the edge of the container and got clippe
 swinging 180° ends up _outside the doorway it started in_ — see section 3 — and a real
 flipbook hides that by being a two-page spread, so the leaf lands on the other half.
 
-The owner spotted the same thing from the other direction: _the whole spread was turning, when
-realistically you only ever flip one page of it._ Both complaints have the same fix, and the
-album is now a genuine spread. **The back face is visible.** Turning forward lifts the right
+The same fault shows from the other direction: a whole spread turning at once, when in reality
+only one page of it ever moves. Both have the same fix, and the album is now a genuine spread. **The back face is visible.** Turning forward lifts the right
 page and lands it on the left, showing its reverse on the way — which was the missing piece.
 
 ---
@@ -169,7 +168,7 @@ the PDF format at all. Any set of images, or any HTML, could be flipped the same
 
 ### Why this project did not use them
 
-`react-pageflip` was the obvious candidate and was rejected on three specific grounds:
+`react-pageflip` was the obvious candidate. It was rejected on three specific grounds:
 
 - **Last published 2022**, with no React 19 in its peer range. This app is on React 19.
 - Its only dependency is declared as `"page-flip": "latest"` — **unpinned**. An install six
@@ -438,27 +437,26 @@ impression than the shadow work, which is why a careful CSS version gets you mos
 e-readers, any "next/previous" that wants weight. It is framework-agnostic — the React here is
 only doing snapshot bookkeeping. In Vue, Svelte or vanilla JS you would keep the outgoing node
 around by whatever means that framework offers, and the CSS would be identical.
-....
-Why the library was a bad bet. Three reasons. It's from 2022 and React 19 came out after — it never claims to support our version, and nobody's maintaining it to check. It declares its own ingredient as "page-flip": "latest", meaning whatever's newest when you install — so your project could build today and break in six months without you touching a line. And it wants to run the pages itself.
 
-Why that last one matters. The DOM is the live list of elements on screen. React's whole deal is that it owns that list — it keeps a mental model and trusts it. StPageFlip works the same way: hand it a container and it says "mine now", moving and rebuilding elements, keeping its own model. Two owners, two models, one set of elements. When they disagree you get the miserable kind of bug — a text box that loses what you typed, a button that stops responding.
+---
 
-And here's the difference that decided it: a Monoprix catalogue is dead pages. Pictures that never change. Handing those to a library is fine, nobody else wants them. Our pages are alive — captions saving as you type, bubbles popping over things, and a page count that grows when you add a photo. Every one of those is React needing to touch an element the flip library thinks it owns.
+## 6. Will CSS ever bend a live element?
 
-How ours works. The realisation is that in a real book, only one page moves. Open a book — the next page isn't flying in, it's been lying under your thumb the whole time. So: the new page renders completely normally, plain React, exactly as if there were no animation (that's why nothing broke). When the page changes I photocopy what was just on screen, lay the copy on top, swing that away like a door on a hinge, then throw it away. React never loses ownership of anything real; the only thing animating is a throwaway nobody's typing into.
+The obvious next question, and the answer is genuinely uncertain.
 
-Why it isn't Monoprix-perfect. Two honest reasons.
+The blocker is not stubbornness on the part of browser vendors. CSS transforms are **affine**:
+matrix operations in which straight lines must stay straight. Bending needs a different class
+of function, and the whole layout and hit-testing engine assumes rectangles. *Where is the
+caret in this text? Which element was clicked?* Both are cheap questions about a rectangle and
+hard ones about a curved surface.
 
-Their page bends — the paper bows as it lifts. CSS can move, rotate, scale and slant a flat rectangle but it cannot bend one; a straight line stays straight, always. That's a hard limit of the technology. To bend a page you stop treating it as HTML and start drawing it, chopping it into strips on a canvas. But once it's painted on a canvas it's a picture — you can't type in it or select its text. Fine for a catalogue, fatal for an album where captions are edited in place. So it's a real trade: their curl, or our live pages.
+There has been movement without arrival. CSS Houdini was intended to open the paint and layout
+pipeline to developers, but browser support stalled. Firefox's `element()` can render a live
+element as an image — the right *shape*, but a snapshot, so still not interactive. The pattern
+in every attempt is the same: **the moment the bend arrives, the typing leaves.**
 
-The second is geometry, not technology: a door swinging 180° ends up outside the doorway it started in. Real flipbooks hide that by being two-page spreads, so the page lands on the other half. We show one page, so the back half of the swing goes off the edge and gets clipped. That's a layout change, not an animation one — the back face is already built and correct, and would appear the day the album becomes a true spread.
+The likelier future is not CSS learning to bend a page, but the trick getting cheaper from the
+other side: a WebGL surface that stays live because a real, invisible input is kept in sync
+behind it. Some 3D interfaces already do exactly this. The result looks the same; the mechanism
+is inverted.
 
-One thing to flag: lines 7–11 of PAGE-TURN.md had my chat message pasted into them — duplicated text and a ## heading that had swallowed a paragraph. Since you'd asked for a simpler explanation in exactly that spot, I replaced that block rather than leaving a broken heading in a doc meant for learning from. Everything typechecks and builds.
-On your question — will CSS ever bend a page and keep it writable?
-Genuinely uncertain, and it's a good question because the two halves pull against each other.
-
-The blocker isn't stubbornness, it's that CSS transforms are affine — matrix maths where straight lines must stay straight. Bending needs a different kind of function, and the whole layout and hit-testing engine assumes rectangles. Where's my cursor in this text? Which element did I click? Those are cheap on a rectangle and hard on a curved surface.
-
-There's real movement, though. CSS Houdini was meant to open the paint and layout pipeline to developers, but browser support stalled. element() in Firefox can render a live element as an image — the right shape, but it snapshots, so it's not interactive either. The pattern in every attempt is the same: the moment you get the bend, you lose the typing.
-
-My honest read: the browser will probably keep drawing a boundary between "laid-out interactive content" and "arbitrarily deformed surface", because clicking and text selection are defined in terms of rectangles all the way down. What I'd bet on instead is the trick getting cheaper — a WebGL surface that stays live because a real, invisible text input is kept in sync behind it. That's how some 3D UIs already fake it. Not CSS bending a page, but the same result from the other side.

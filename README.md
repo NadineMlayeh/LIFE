@@ -26,7 +26,6 @@ Nothing is filed in a menu. You open the thing itself.
 - [Running it locally](#running-it-locally)
 - [Deployment](#deployment)
 - [Documentation](#documentation)
-- [Status and limitations](#status-and-limitations)
 
 ---
 
@@ -140,13 +139,13 @@ Three things you decide about yourself.
 
 ## Engineering worth a look
 
-Six things that were not obvious, in case you are reading this as a reviewer.
+Six things that were not obvious.
 
 **1. Privacy is a database concern, not an interface one.**
-The shared view builds its payload from queries that only ask for rows marked shared. During
-review I found the timeline and profile were being fetched in full and *then* discarded if
-private — nothing leaked, but the guarantee was accidental rather than enforced. It now checks
-visibility first and never loads what it will not send.
+The shared view builds its payload from queries that only ask for rows marked shared. A review
+turned up the timeline and profile being fetched in full and *then* discarded if private —
+nothing leaked, but the guarantee was accidental rather than enforced. Visibility is now checked
+before the queries run, so what will not be sent is never loaded.
 → `backend/src/sharing/sharing.service.ts`
 
 **2. Every texture is generated, not downloaded.**
@@ -272,30 +271,9 @@ variable, and what to check when something is wrong: **[docs/DEPLOYMENT.md](docs
 
 | Document | What is in it |
 |---|---|
-| **[UNDERSTANDING-LIFE.md](docs/UNDERSTANDING-LIFE.md)** | A full walk through the codebase in plain language — how the backend, the database, Three.js and the panels work, and why each decision was made |
 | **[PAGE-TURN.md](docs/PAGE-TURN.md)** | How a realistic page turn works, why flipbook sites are built the way they are, and how to do it in any framework |
 | **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Deploying free, and why each service was chosen |
 | **[LIFE_master_spec.md](docs/LIFE_master_spec.md)** | The original product specification |
-
----
-
-## Status and limitations
-
-Honest about what this is: a **complete, working application** that has not yet been used by
-anyone but its author.
-
-**Known gaps, in the order I would close them:**
-
-- **No automated tests.** The most valuable would be on the privacy boundary — proving the
-  shared payload can never contain an unshared record.
-- **Rate-limit counters are per-instance.** They live in memory, so they reset on restart and
-  are not shared across instances. Fine for one small server; Redis is the fix.
-- **Tokens are kept in `localStorage`**, which is readable by any script on the page. An
-  httpOnly cookie is safer but needs CSRF handling across two domains. A deliberate trade,
-  not an oversight.
-- **No mobile version.** The room is desktop-only by design — squeezing a 3D space onto a phone
-  while still designing it would have compromised both. Mobile is intended as its own build.
-- **Expired verification and reset tokens are never swept.** Harmless, but untidy.
 
 ---
 
