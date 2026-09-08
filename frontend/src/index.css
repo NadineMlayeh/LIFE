@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+/*
+  LIFE's paper design system. The interface is meant to read as documents resting in the room,
+  not as a web app layered over it — so the vocabulary here is paper, ink, ruled lines and
+  brass, and every surface inherits from these tokens rather than inventing its own colour.
+
+  Fonts are deliberately system stacks: the room is generated entirely from code with no
+  downloaded assets, and pulling a webfont would break that for the one layer that sits on top
+  of it. Georgia is a warm transitional serif present nearly everywhere.
+*/
+:root {
+  color-scheme: light;
+
+  --paper: #F3E9D6;
+  --paper-lit: #FAF3E4;
+  --paper-edge: #E2D3B6;
+  --paper-deep: #E8DCC2;
+
+  --ink: #3A2C1D;
+  --ink-soft: #6E5B42;
+  --ink-faint: #9A876C;
+
+  --rule: rgba(58, 44, 29, 0.22);
+  --rule-strong: rgba(58, 44, 29, 0.4);
+
+  --brass: #A8863C;
+  --brass-lit: #C9A24A;
+  --oxblood: #7A3B33;
+  --forest: #3F5445;
+
+  --leather: #6B4A2E;
+
+  /*
+    Old-style faces, oldest first. Garamond, Book Antiqua and Palatino are genuine
+    sixteenth/eighteenth-century revivals and ship with Windows and macOS, so the period
+    feeling costs no download — the same rule the room follows.
+    (A true Caslon would have to be fetched or shipped as a file; see PROGRESS.md.)
+  */
+  --serif: 'Cormorant Garamond', Garamond, 'EB Garamond', 'Book Antiqua', 'Palatino Linotype',
+    Palatino, Baskerville, 'Hoefler Text', 'Times New Roman', serif;
+  --sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+
+  --lift-sm: 0 1px 2px rgba(58, 44, 29, 0.12), 0 4px 10px rgba(58, 44, 29, 0.08);
+  --lift-md: 0 2px 4px rgba(58, 44, 29, 0.14), 0 12px 28px rgba(58, 44, 29, 0.16);
+  --lift-lg: 0 6px 12px rgba(58, 44, 29, 0.18), 0 30px 70px rgba(58, 44, 29, 0.28);
+}
+
+/* One voice throughout. The old-style serif is the whole character of the interface, so
+   headings, body copy and everything you type into are all set in it — a sans-serif input
+   sitting under a serif heading is what made the forms feel bolted on. */
+body {
+  margin: 0;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+}
+
+@layer base {
+  input,
+  textarea,
+  select,
+  button {
+    background-color: transparent;
+    color: var(--ink);
+    font-family: var(--serif);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ink-faint);
+  }
+}
+
+@layer components {
+  /*
+    Aged paper, built in layers the way the room's textures are — no image files.
+
+      1. an SVG turbulence filter baked into a data URI supplies real fibre grain
+      2. foxing: scattered brown blotches, the stains old paper acquires
+      3. a broad tonal drift so no two areas are the same value
+      4. a vignette darkening toward the edges, where a sheet handles and soils most
+
+    A single flat colour is exactly what made the first version read as a div.
+  */
+  .paper {
+    position: relative;
+    background-color: var(--paper);
+    /* Broad, soft washes only. Hard-edged radial gradients read as literal dots on the page,
+       which is worse than a flat fill — the grain has to come from noise, not from shapes. */
+    background-image:
+      radial-gradient(130% 100% at 16% 0%, rgba(255, 250, 234, 0.9), transparent 66%),
+      radial-gradient(120% 90% at 94% 100%, rgba(176, 145, 96, 0.2), transparent 62%),
+      radial-gradient(150% 130% at 50% 50%, transparent 48%, rgba(122, 94, 54, 0.18) 100%);
+    color: var(--ink);
+    box-shadow: var(--lift-lg);
+  }
+
+  /*
+    The fibre. One pass, no blend mode: `mix-blend-mode` forces the whole sheet through a
+    compositing step on every repaint, and with a live WebGL canvas behind it that made typing
+    stutter. Plain opacity costs nothing.
+  */
+  .paper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.42;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.42 0 0 0 0 0.33 0 0 0 0 0.2 0 0 0 0.55 0'/></filter><rect width='300' height='300' filter='url(%23f)'/></svg>");
+    background-size: 300px 300px;
+  }
+
+  /* Content must sit above the noise layer. */
+  .paper > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Headings are set in the serif; body copy and data stay in the sans so long text and
+     form values remain easy to read. Two decorative faces is what tips period design into
+     costume. */
+  .display {
+    font-family: var(--serif);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+  }
+
+  .small-caps {
+    font-family: var(--serif);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  /*
+    The single most important rule in this system: a field on paper is not a box, it is a
+    ruled line with its label above it. Bordered rectangles are what make a form look like a
+    web form no matter how warm the palette around them is.
+  */
+  .ruled-field {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+    padding: 6px 2px;
+    font-size: 17px;
+    font-family: var(--serif);
+    color: var(--ink);
+    /* Only the rule reacts. Tinting the field's background on focus made the paper appear to
+       change colour under the text as you typed. */
+    transition: border-color 180ms ease;
+  }
+
+  .ruled-field:focus {
+    outline: none;
+    border-bottom-color: var(--brass);
+  }
+
+  .ruled-field::placeholder {
+    color: var(--ink-faint);
+  }
+
+  /* A brass plate, used for the one primary action on a surface. */
+  .brass-button {
+    font-family: var(--serif);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #2E2413;
+    background-image: linear-gradient(160deg, #E2C67E 0%, #C9A24A 42%, #A8863C 100%);
+    border: 1px solid rgba(70, 52, 18, 0.45);
+    border-radius: 2px;
+    padding: 9px 18px;
+    box-shadow: var(--lift-sm);
+    transition: filter 180ms ease, transform 180ms ease;
+  }
+
+  .brass-button:hover:not(:disabled) {
+    filter: brightness(1.07);
+  }
+
+  .brass-button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .brass-button:disabled {
+    filter: grayscale(0.4) brightness(0.94);
+    cursor: not-allowed;
+  }
+
+  /* A quieter action: ink on paper, underlined on hover like a printed cross-reference. */
+  .quiet-button {
+    font-family: var(--serif);
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 0;
+    padding: 8px 10px;
+    transition: color 160ms ease;
+  }
+
+  .quiet-button:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* Hairline dividers rather than card borders — printed documents rule, they don't box. */
+  .hairline {
+    border: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .hairline-double {
+    border: 0;
+    border-top: 3px double var(--rule-strong);
+  }
+}

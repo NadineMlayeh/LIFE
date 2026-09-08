@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: life_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: life
+      POSTGRES_PASSWORD: life
+      POSTGRES_DB: life_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - life_postgres_data:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: life_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  life_postgres_data:

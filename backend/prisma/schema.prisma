@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Visibility {
+  PRIVATE
+  SHARE_ONLY
+  PUBLIC
+}
+
+enum GoalStatus {
+  PENDING
+  ACHIEVED
+  NOT_ACHIEVED
+  RESCHEDULED
+}
+
+enum ItemType {
+  PERSON
+  PLACE
+  MEMORY
+  EVENT
+  ACHIEVEMENT
+  NOTE
+  FILE
+  PHOTO
+  CUSTOM
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  verificationTokens EmailVerificationToken[]
+  profile         Profile?
+  books           Book[]
+  timelineEvents  TimelineEvent[]
+  notes           Note[]
+  photos          Photo[]
+  files           File[]
+  visitedCountries VisitedCountry[]
+  privacySettings PrivacySetting[]
+  shareLinks      ShareLink[]
+  sentLetters     Letter[]         @relation("SentLetters")
+  receivedLetters Letter[]         @relation("ReceivedLetters")
+}
+
+// Spec C.8: deliberately minimal. A letter between two LIFE accounts — not a chat system,
+// not a feed, no attachments.
+model Letter {
+  id          String    @id @default(uuid())
+  senderId    String
+  sender      User      @relation("SentLetters", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User      @relation("ReceivedLetters", fields: [recipientId], references: [id], onDelete: Cascade)
+  subject     String
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([recipientId])
+  @@index([senderId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Profile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName    String?
+  dob         DateTime?
+  birthplace  String?
+  nationality String?
+  languages   String?
+  updatedAt   DateTime @updatedAt
+
+  // Spec C.1.1: every identity field is independently privacy-controllable. Explicit columns
+  // rather than PrivacySetting rows, because the field set is fixed and known.
+  fullNameVisibility    Visibility @default(PRIVATE)
+  dobVisibility         Visibility @default(PRIVATE)
+  birthplaceVisibility  Visibility @default(PRIVATE)
+  nationalityVisibility Visibility @default(PRIVATE)
+  languagesVisibility   Visibility @default(PRIVATE)
+}
+
+model Book {
+  id       String  @id @default(uuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title    String
+  icon     String?
+  isCustom Boolean @default(true)
+  isHidden Boolean @default(false)
+
+  chapters       Chapter[]
+  timelineEvents TimelineEvent[]
+  photos         Photo[]
+
+  @@index([userId])
+}
+
+model Chapter {
+  id     String @id @default(uuid())
+  bookId String
+  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  title  String
+  order  Int    @default(0)
+
+  items Item[]
+
+  @@index([bookId])
+}
+
+model Item {
+  id        String    @id @default(uuid())
+  chapterId String
+  chapter   Chapter   @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  type      ItemType
+  title     String
+  body      String?
+  itemDate  DateTime?
+  createdAt DateTime  @default(now())
+
+  photos Photo[]
+  files  File[]
+
+  @@index([chapterId])
+}
+
+model TimelineEvent {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  date        DateTime
+  description String?
+  type        String?
+  bookId      String?
+  book        Book?       @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  isGoal      Boolean     @default(false)
+  goalStatus  GoalStatus?
+  createdAt   DateTime    @default(now())
+
+  photos Photo[]
+  files  File[]
+
+  @@index([userId])
+  @@index([bookId])
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Photo {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storagePath  String
+  originalName String
+  mimeType     String
+  size         Int
+  caption      String?
+  visibility   Visibility @default(PRIVATE)
+  isFeatured   Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  // Spec C.1.3 / C.3.5: a photo may optionally hang off an event, a book or an item.
+  timelineEventId String?
+  timelineEvent   TimelineEvent? @relation(fields: [timelineEventId], references: [id], onDelete: SetNull)
+  bookId          String?
+  book            Book?          @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  itemId          String?
+  item            Item?          @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([timelineEventId])
+  @@index([bookId])
+  @@index([itemId])
+}
+
+model File {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storagePath  String
+  originalName String
+  mimeType     String
+  size         Int
+  visibility   Visibility @default(PRIVATE)
+  createdAt    DateTime   @default(now())
+
+  timelineEventId String?
+  timelineEvent   TimelineEvent? @relation(fields: [timelineEventId], references: [id], onDelete: SetNull)
+  itemId          String?
+  item            Item?          @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([timelineEventId])
+  @@index([itemId])
+}
+
+model VisitedCountry {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  countryCode String
+  visitedDate DateTime?
+  notes       String?
+  status      String    @default("visited")
+
+  @@index([userId])
+}
+
+model PrivacySetting {
+  id         String     @id @default(uuid())
+  entityType String
+  entityId   String
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visibility Visibility @default(PRIVATE)
+
+  @@unique([entityType, entityId])
+  @@index([userId])
+}
+
+model ShareLink {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  createdAt DateTime @default(now())
+  revoked   Boolean  @default(false)
+
+  @@index([userId])
+}
