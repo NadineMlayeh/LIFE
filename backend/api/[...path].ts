@@ -51,6 +51,11 @@ export default async function handler(req: Request, res: Response) {
   /*
     Strip the `/api` prefix before Express sees the request.
 
+    The filename matters: `[...path]` is a catch-all and matches any depth. `[[...path]]` is a
+    Next.js convention that a plain Vercel function does not recognise — it was read as a single
+    dynamic segment, so `/books` reached the app and `/auth/login` returned a 404 from the
+    platform. One-segment routes working while two-segment ones do not is the signature of it.
+
     Every path is rewritten to `/api/<path>` so that a single catch-all function handles the
     whole API — but Nest's routes are declared without that prefix (`/auth/login`, not
     `/api/auth/login`). Left in place, every request would 404.
