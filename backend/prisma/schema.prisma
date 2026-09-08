@@ -223,6 +223,24 @@ model ShareLink {
 /// A single-use token for setting a forgotten password. Separate from the email-verification
 /// token because the two mean different things: one proves you own an address, the other
 /// grants the power to change a credential.
+/// The bytes of an uploaded photograph, when there is nowhere else to put them.
+///
+/// Object storage is the right home for files, and `StorageService` prefers it whenever one is
+/// configured. But every provider worth using now asks for a payment card even on a free tier,
+/// which is a hard stop rather than an inconvenience — so this exists as a third option that
+/// needs no account at all.
+///
+/// Deliberately its own table rather than a column on `Photo`: listing an album must not drag
+/// megabytes of image data along with the captions.
+model StoredFile {
+  /// The same `storagePath` held on the Photo row.
+  path      String   @id
+  data      Bytes
+  mimeType  String
+  size      Int
+  createdAt DateTime @default(now())
+}
+
 model PasswordResetToken {
   id        String    @id @default(uuid())
   userId    String

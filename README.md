@@ -168,9 +168,11 @@ makes Three.js recompile every material's shader. The lamp is now always mounted
 zero.
 
 **5. The storage layer has one seam.**
-Local disk in development, S3-compatible object storage in production, chosen by one
-environment variable. This mattered more than expected: serverless hosting has no persistent
-filesystem, so local disk in production loses every upload *silently*.
+Three backends — local disk, the database, or any S3-compatible bucket — chosen by environment
+variables, with nothing outside that file aware of which is in use. It earned its keep twice:
+serverless hosting has no persistent filesystem, and every object-storage free tier now wants a
+payment card, so being able to fall back to the database without touching application code was
+the difference between deploying and not.
 → `backend/src/storage/storage.service.ts`
 
 **6. Three dependencies were rejected on inspection.**
@@ -192,8 +194,9 @@ NestJS 12 · TypeScript (ESM) · Prisma 6 · PostgreSQL · Passport JWT · bcryp
 Helmet
 
 **Infrastructure**
-Vercel (frontend and serverless API) · Neon (Postgres) · Cloudflare R2 (object storage) ·
-Resend (email) · Docker Compose and Mailpit for local development
+Vercel (frontend and serverless API) · Neon (Postgres) · Resend (email) ·
+photograph storage in the database or any S3-compatible bucket ·
+Docker Compose and Mailpit for local development
 
 ---
 

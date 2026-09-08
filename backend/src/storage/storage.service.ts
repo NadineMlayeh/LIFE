@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Readable as NodeReadable } from 'node:stream';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -9,35 +10,47 @@ import { randomUUID } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
+import { PrismaService } from '../prisma/prisma.service.js';
 import type { Readable } from 'node:stream';
 
 /**
  * The single seam between LIFE and where the bytes of a photograph physically live.
  *
- * Two backends, chosen by whether `S3_BUCKET` is set:
+ * Three backends, chosen by configuration:
  *
- *  - **Local disk**, for development. Simple, free, and inspectable — the files are just there
- *    in a folder you can open.
- *  - **Object storage**, for deployment. Anything S3-compatible: Cloudflare R2, Backblaze B2,
- *    S3 itself. This is not optional in production, because serverless hosting has **no
- *    persistent disk** — a file written during one request is gone before the next, since the
- *    machine that handled it no longer exists. Local disk in production silently loses every
- *    upload, which is the worst kind of failure: it looks like it worked.
+ *  1. **Object storage** — used whenever `S3_BUCKET` is set. Anything S3-compatible: Cloudflare
+ *     R2, Backblaze B2, S3 itself. The right home for files, and the one to grow into.
+ *  2. **The database** — used when `STORE_FILES_IN_DB` is on. Not where files belong, but it
+ *     needs no second account and no payment card, which every object-storage free tier now
+ *     asks for. For a personal archive it is entirely workable: browser-compressed photographs
+ *     are around 300 KB, so a 0.5 GB free Postgres holds roughly fifteen hundred of them.
+ *  3. **Local disk** — the default, for development.
+ *
+ * **One of the first two is required in production.** Serverless hosting has no persistent
+ * filesystem: a file written during one request is gone before the next, because the machine
+ * that handled it no longer exists. Falling back to disk there loses every upload *silently*,
+ * which is the worst kind of failure — it looks like it worked.
  *
  * Nothing outside this file knows which is in use. The rest of the application deals in
- * `storagePath` strings and never touches a filesystem.
+ * `storagePath` strings and never touches a filesystem. Moving between the three is a change
+ * of environment variables, not of code.
  */
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly root = resolve(process.env.UPLOAD_DIR ?? 'uploads');
   private readonly bucket = process.env.S3_BUCKET;
+  private readonly inDatabase = process.env.STORE_FILES_IN_DB === 'true';
   private readonly client: S3Client | null;
 
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     if (!this.bucket) {
       this.client = null;
-      this.logger.log('Photographs are stored on local disk');
+      this.logger.log(
+        this.inDatabase
+          ? 'Photographs are stored in the database'
+          : 'Photographs are stored on local disk',
+      );
       return;
     }
 
@@ -71,6 +84,21 @@ export class StorageService {
       return key;
     }
 
+    if (this.inDatabase) {
+      await this.prisma.storedFile.create({
+        data: {
+          path: key,
+          // Multer gives a Node Buffer; Prisma's Bytes column wants a plain Uint8Array, and
+          // TypeScript will not treat one as the other because a Buffer may be backed by
+          // shared memory. Copying into a Uint8Array is the honest conversion.
+          data: new Uint8Array(file.buffer),
+          mimeType: file.mimetype,
+          size: file.size,
+        },
+      });
+      return key;
+    }
+
     const directory = join(this.root, userId, folder);
     await mkdir(directory, { recursive: true });
     await writeFile(join(this.root, key), file.buffer);
@@ -97,6 +125,20 @@ export class StorageService {
       }
     }
 
+    if (this.inDatabase) {
+      const row = await this.prisma.storedFile.findUnique({ where: { path: storagePath } });
+      if (!row) return null;
+      /*
+        Wrapped in an ARRAY, which is not a detail to skip.
+
+        `Readable.from` treats its argument as an iterable, and a Uint8Array iterates over
+        individual *numbers* — so passing the bytes directly emits one integer per byte and the
+        HTTP response rejects the first one. Putting it in an array makes the stream yield the
+        whole buffer as a single chunk, which is what a file read looks like.
+      */
+      return NodeReadable.from([Buffer.from(row.data)]);
+    }
+
     const absolute = this.toAbsolute(storagePath);
     if (!existsSync(absolute)) return null;
     return createReadStream(absolute);
@@ -107,6 +149,13 @@ export class StorageService {
       await this.client.send(
         new DeleteObjectCommand({ Bucket: this.bucket, Key: storagePath }),
       );
+      return;
+    }
+
+    if (this.inDatabase) {
+      // `deleteMany` rather than `delete`: removing a file that is already gone should be a
+      // no-op, not an error.
+      await this.prisma.storedFile.deleteMany({ where: { path: storagePath } });
       return;
     }
 

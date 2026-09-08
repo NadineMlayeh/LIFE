@@ -12,7 +12,7 @@ free plans these services actually intend people to stay on.
 | Frontend | **Vercel** | Free forever for personal projects. Static files on a CDN — nothing to keep running. |
 | API | **Vercel Functions** | Same project type. No server sitting idle, so nothing to pay for and nothing to spin down. |
 | Database | **Neon** | Free Postgres. See below — this is the choice that matters most. |
-| Photographs | **Cloudflare R2** | 10 GB free, and **no charge for reading files back**, which is unusual and matters for an image-heavy app. |
+| Photographs | **The database**, or Cloudflare R2 | See step 2 — R2 is better, but asks for a card. |
 | Email | **Resend** | 3,000 emails a month free, permanently. |
 
 ### Why Neon and not Supabase
@@ -41,9 +41,10 @@ A serverless function inverts it: there is no process between requests at all. T
 copy when a request arrives, and cold starts are on the order of a second rather than a minute.
 That is why it can be free, and it is why two things in this codebase are the way they are:
 
-- **Photographs go to object storage, never disk.** A serverless machine has no persistent
-  filesystem — a file written during one request is gone before the next. Local disk in
-  production loses every upload *silently*, which is the worst kind of failure.
+- **Photographs never go to disk.** A serverless machine has no persistent filesystem — a file
+  written during one request is gone before the next. They go to object storage or, failing
+  that, the database. Local disk in production loses every upload *silently*, which is the
+  worst kind of failure.
 - **Rate-limit counters are per-instance.** They live in memory, so they reset when an instance
   is recycled. Documented in `common/rate-limit.guard.ts`; Redis is the fix if it ever matters.
 
@@ -71,18 +72,41 @@ deploy`, so the schema is created on the first deployment and updated on every o
 
 ---
 
-## 2. Photograph storage — Cloudflare R2
+## 2. Photograph storage
 
-1. Sign up at **cloudflare.com**, open **R2** in the sidebar, and create a bucket. Call it
-   `life-photos`.
-2. **Manage R2 API Tokens** → **Create API token**. Give it *Object Read & Write* on that
-   bucket. Copy the **Access Key ID** and **Secret Access Key** — the secret is shown once.
-3. Note the **S3 API endpoint** on the bucket page. It looks like
-   `https://<account-id>.r2.cloudflarestorage.com`.
+Two ways. **Pick B if you would rather not hand over a card** — it needs no second account at
+all, and switching later is a change of environment variables, not of code.
+
+### Option A — Cloudflare R2 (better, needs a payment card)
+
+The right home for files: 10 GB free, and unusually, **no charge for reading them back**, which
+matters for an image-heavy app. Cloudflare asks for a card to verify the account even on the
+free plan; it is not charged at this scale.
+
+1. Sign up at **cloudflare.com**, open **R2**, create a bucket called `life-photos`.
+2. **Manage R2 API Tokens** → **Create API token**, *Object Read & Write* on that bucket. Copy
+   the **Access Key ID** and **Secret Access Key** — the secret is shown once.
+3. Note the **S3 API endpoint**: `https://<account-id>.r2.cloudflarestorage.com`.
 
 Keep the bucket **private**. LIFE streams photographs through the API on purpose, so every read
 is checked against current privacy settings. A public bucket URL is a permanent key: anyone who
 ever saw it keeps access forever, whatever you later decide.
+
+### Option B — store them in the database (no card, no extra account)
+
+Set `STORE_FILES_IN_DB=true` and leave `S3_BUCKET` empty. That is the whole setup.
+
+Files in a database is not what you would choose given a free hand — it makes backups larger
+and reads heavier than a bucket would. But at this scale it is entirely workable, and being
+able to deploy at all beats a purer architecture you cannot reach. Photographs are compressed
+in the browser to roughly 300 KB, so Neon's free 0.5 GB holds **about 1,500 of them**.
+
+If you later add a bucket, set the `S3_*` variables and turn this off. Existing photographs
+would need copying across, but nothing in the code changes.
+
+**Be able to explain this one.** "Why are you storing blobs in Postgres?" is a fair question,
+and the answer — *object storage is correct, the free tiers all require a card, the storage
+layer has one seam so moving is a config change* — shows you knew the trade you were making.
 
 ---
 
@@ -116,11 +140,22 @@ SMTP settings: host `smtp.resend.com`, port `587`, user `resend`, password = the
    | `SMTP_USER` | `resend` |
    | `SMTP_PASS` | Your Resend API key |
    | `MAIL_FROM` | `LIFE <onboarding@resend.dev>` |
+
+   Then **either** (option A):
+
+   | Name | Value |
+   |---|---|
    | `S3_BUCKET` | `life-photos` |
    | `S3_ENDPOINT` | Your R2 endpoint |
    | `S3_REGION` | `auto` |
    | `S3_ACCESS_KEY_ID` | From R2 |
    | `S3_SECRET_ACCESS_KEY` | From R2 |
+
+   **or** (option B — no card):
+
+   | Name | Value |
+   |---|---|
+   | `STORE_FILES_IN_DB` | `true` |
 
 4. Deploy. Note the URL — something like `life-api.vercel.app`.
 
@@ -177,9 +212,10 @@ frontend's origin. No trailing slash.
 **Emails never arrive.** Without a verified domain Resend only delivers to your own address.
 Check Resend's dashboard — it logs every attempt and why it failed.
 
-**Photographs vanish after upload.** `S3_BUCKET` is unset, so the API fell back to local disk
-and the file went to a machine that no longer exists. The API's startup log says which backend
-it chose.
+**Photographs vanish after upload.** Neither `S3_BUCKET` nor `STORE_FILES_IN_DB` is set, so the
+API fell back to local disk and the file went to a machine that no longer exists. The API's
+startup log says which backend it chose — check it says "bucket" or "database", never "local
+disk", in production.
 
 **The first request after a quiet day is slow.** Expected: Neon waking and a cold function
 start. Subsequent requests are normal.
@@ -194,8 +230,8 @@ and add `directUrl = env("DIRECT_URL")` to the datasource block in `schema.prism
 
 Nothing, at this scale. The limits you would hit first, in order:
 
-1. **R2 storage** — 10 GB. Uploads are compressed in the browser to roughly 300 KB, so that is
-   in the region of 30,000 photographs.
+1. **Photograph storage** — 10 GB on R2 (around 30,000 photographs), or the database's 0.5 GB
+   (around 1,500). Uploads are compressed in the browser to roughly 300 KB.
 2. **Resend** — 3,000 emails a month. Only sent on signup and password reset.
 3. **Neon** — 0.5 GB of database. Text is small; this is a long way off.
 4. **Vercel** — 100 GB of bandwidth a month.
