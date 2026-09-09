@@ -40,9 +40,16 @@ export function VisitPage() {
   const [featuredUrl, setFeaturedUrl] = useState<string | null>(null)
   const featuredRef = useRef<string | null>(null)
 
+  /**
+   * A shared link is the one address that gets sent to people, and most of them will open it
+   * on a phone. The room genuinely wants a wide window and a pointer, so the warning stays —
+   * but it must not be the end of the road: a visitor who has followed a link and been told
+   * only "not here" has been shown nothing at all, and has no reason to come back on a laptop.
+   */
   const [smallScreen, setSmallScreen] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 900,
   )
+  const [ignoreScreenSize, setIgnoreScreenSize] = useState(false)
   useEffect(() => {
     const onResize = () => setSmallScreen(window.innerWidth < 900)
     window.addEventListener('resize', onResize)
@@ -123,15 +130,21 @@ export function VisitPage() {
     )
   }
 
-  if (smallScreen) {
+  if (smallScreen && !ignoreScreenSize) {
     return (
       <Centred>
         <div className="max-w-sm text-center">
           <h1 className="text-lg text-[#5C4630]">{view.owner.username}&rsquo;s room</h1>
-          <p className="mt-2 text-sm text-[#8A6B4A]">
-            A room needs a wider window than this. Open the link on a larger screen to look
-            around it.
+          <p className="mt-2 text-sm leading-relaxed text-[#8A6B4A]">
+            A room needs a wider window than this. On a laptop you can look around it properly.
           </p>
+          <button
+            type="button"
+            onClick={() => setIgnoreScreenSize(true)}
+            className="mt-5 inline-block rounded-full border border-[#C9A77C]/60 px-4 py-1.5 text-xs text-[#5C4630] transition-colors hover:bg-[#C9A77C]/20"
+          >
+            Look anyway
+          </button>
         </div>
       </Centred>
     )
