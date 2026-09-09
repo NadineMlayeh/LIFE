@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { getErrorMessage, getErrorStatus } from '../../services/apiError'
 import * as authService from '../../services/authService'
@@ -42,8 +42,21 @@ export function IdentityPanel({
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  /*
+    Fetched once, not on every open.
+
+    The panel stays mounted behind the room rather than being torn down when it closes, so
+    whatever was loaded is still here the next time — refetching it made opening the mirror
+    wait on a round trip that could only ever return what was already on screen. The other
+    panels were already written this way; this one had been missed.
+
+    Edits made here update this state directly, so nothing goes stale by not asking again.
+  */
+  const loaded = useRef(false)
+
   useEffect(() => {
-    if (!open) return
+    if (!open || loaded.current) return
+    loaded.current = true
     setLoading(true)
     profileApi
       .get()
