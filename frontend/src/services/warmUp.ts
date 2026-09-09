@@ -40,10 +40,20 @@ export function warmUpApi(): void {
 export function prefetchRoom(): void {
   const load = () => void import('../pages/RoomPage').catch(() => {})
 
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(load, { timeout: 3000 })
+  /*
+    Checked with `typeof`, not `'requestIdleCallback' in window`.
+
+    TypeScript's DOM types declare the method as always present, so the `in` form narrows the
+    *else* branch to `never` — and every use of `window` inside it then fails to compile. The
+    types are wrong about this rather than the code: Safari has only recently shipped it, and a
+    build that trusts the declaration breaks on the browsers the fallback exists for.
+  */
+  const idle = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback : null
+
+  if (idle) {
+    idle.call(window, load, { timeout: 3000 })
   } else {
-    // Safari, at time of writing. A plain delay is a reasonable stand-in.
+    // A plain delay is a reasonable stand-in where the browser will not tell us when it is free.
     window.setTimeout(load, 1500)
   }
 }

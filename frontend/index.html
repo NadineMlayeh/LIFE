@@ -2,9 +2,45 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- The room is dark walnut and gilt; this stops mobile browsers framing it in white. -->
+    <meta name="theme-color" content="#20150E" />
+
+    <title>LIFE — a private place to keep a life</title>
+    <meta
+      name="description"
+      content="A personal archive you enter through a Victorian study rendered in the browser. Writing, a timeline, photographs, a map and letters — each one an object you open rather than a menu you navigate."
+    />
+
+    <!--
+      Link previews, which are the first thing anyone sees of this.
+
+      A shared link with no card is a bare blue URL, and the room is the entire argument for the
+      project — so the preview image is a real frame of it rather than a logo. Absolute URLs are
+      required here: the scrapers that read these tags do not resolve relative paths.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LIFE" />
+    <meta property="og:title" content="LIFE — a private place to keep a life" />
+    <meta
+      property="og:description"
+      content="A personal archive you enter through a Victorian study rendered in the browser. Every surface is generated in code — no models, no downloaded textures."
+    />
+    <meta property="og:url" content="https://life-app-sage.vercel.app/" />
+    <meta property="og:image" content="https://life-app-sage.vercel.app/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A Victorian study: a curtained window, a bookshelf, a world map and a framed photograph." />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LIFE — a private place to keep a life" />
+    <meta
+      name="twitter:description"
+      content="A personal archive you enter through a Victorian study rendered in the browser."
+    />
+    <meta name="twitter:image" content="https://life-app-sage.vercel.app/og.jpg" />
   </head>
   <body>
     <div id="root"></div>
