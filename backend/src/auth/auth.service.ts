@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -36,6 +37,8 @@ export interface AuthResult {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -43,7 +46,11 @@ export class AuthService {
     private readonly books: BooksService,
   ) {}
 
-  async signup(email: string, username: string, password: string): Promise<{ message: string }> {
+  async signup(
+    email: string,
+    username: string,
+    password: string,
+  ): Promise<{ message: string; delivered: boolean }> {
     const existing = await this.prisma.user.findUnique({ where: { email } });
 
     if (existing?.emailVerified) {
@@ -72,9 +79,22 @@ export class AuthService {
         })
       : await this.prisma.user.create({ data: { email, username, usernameLower, passwordHash } });
 
-    await this.sendVerificationToken(user.id, user.email);
+    const delivered = await this.sendVerificationToken(user.id, user.email);
 
-    return { message: 'Check your email for a verification link.' };
+    /*
+      The account is created either way.
+
+      If the letter could not be posted, saying so is the only honest answer: the registration
+      genuinely succeeded, and asking for another letter is genuinely the next step. Failing
+      the whole request instead would leave an account nobody was told about, reachable only
+      by registering the same address again.
+    */
+    return {
+      message: delivered
+        ? 'Check your email for a verification link.'
+        : 'Your account was created, but the letter could not be sent just now.',
+      delivered,
+    };
   }
 
   /**
@@ -180,6 +200,7 @@ export class AuthService {
       await this.sendVerificationToken(user.id, user.email);
     }
 
+    // Same reasoning as the reset route: the answer must not depend on whether the letter went.
     return { message: 'If that account exists and is unverified, a new link has been sent.' };
   }
 
@@ -216,8 +237,18 @@ export class AuthService {
       data: { userId: user.id, token, expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
     });
 
+    /*
+      Delivery failures are swallowed deliberately, and this is the route where it matters
+      most. An unknown address returns `sent` above without contacting the provider at all —
+      so if a real address could produce an error instead, the difference between the two
+      answers would reveal which addresses are registered. That is exactly what the identical
+      message exists to prevent.
+    */
     const appUrl = process.env.APP_URL ?? 'http://localhost:5173';
-    await this.mail.sendPasswordResetEmail(user.email, `${appUrl}/reset?token=${token}`);
+    await this.deliver(
+      () => this.mail.sendPasswordResetEmail(user.email, `${appUrl}/reset?token=${token}`),
+      'password reset',
+    );
 
     return sent;
   }
@@ -243,7 +274,8 @@ export class AuthService {
     return { message: 'Your password has been changed. You can log in with it now.' };
   }
 
-  private async sendVerificationToken(userId: string, email: string): Promise<void> {
+  /** Issues a fresh verification link, and reports whether the letter actually went. */
+  private async sendVerificationToken(userId: string, email: string): Promise<boolean> {
     await this.prisma.emailVerificationToken.updateMany({
       where: { userId, usedAt: null },
       data: { usedAt: new Date() },
@@ -259,6 +291,36 @@ export class AuthService {
     });
 
     const appUrl = process.env.APP_URL ?? 'http://localhost:5173';
-    await this.mail.sendVerificationEmail(email, `${appUrl}/verify?token=${token}`);
+    return this.deliver(
+      () => this.mail.sendVerificationEmail(email, `${appUrl}/verify?token=${token}`),
+      'verification',
+    );
+  }
+
+  /**
+   * Posts a letter and reports whether it left, instead of letting the failure escape.
+   *
+   * Sending mail is the one part of these routes that depends on a service outside this
+   * application, and it fails for reasons that have nothing to do with the request: the
+   * provider is unreachable, the sending domain is unverified, the recipient is refused. None
+   * of those mean the work already done should be undone, and all of them arrive as a plain
+   * error that would otherwise surface as a bare 500 — the least informative answer there is.
+   *
+   * The token is always written before this runs, so a letter that fails to send can still be
+   * asked for again and the link in it will work.
+   *
+   * The reason is logged in full because the server log is the only place it can be read
+   * afterwards; it is never returned, since it describes the mail account rather than the
+   * caller.
+   */
+  private async deliver(send: () => Promise<void>, kind: string): Promise<boolean> {
+    try {
+      await send();
+      return true;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Could not send the ${kind} email: ${reason}`);
+      return false;
+    }
   }
 }

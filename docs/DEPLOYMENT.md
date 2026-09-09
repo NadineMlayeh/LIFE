@@ -194,8 +194,9 @@ Both matter:
 ## Checking it worked
 
 1. Open the frontend. The auth doors should appear.
-2. Register. **Check your inbox for a real email** — that proves Resend, `APP_URL` and the
-   database are all correct at once.
+2. Register **with the address your Resend account uses**. Any other recipient is refused
+   until a domain is verified. The email arriving proves Resend, `APP_URL` and the database
+   are all correct at once.
 3. Verify, log in, and open the room.
 4. Upload a photograph and reload. If it survives, R2 is wired correctly. *This is the one to
    test properly*: with storage misconfigured the upload appears to succeed and the image is
@@ -209,8 +210,17 @@ Both matter:
 **Every request fails with a CORS error.** `FRONTEND_URL` on the API does not exactly match the
 frontend's origin. No trailing slash.
 
-**Emails never arrive.** Without a verified domain Resend only delivers to your own address.
-Check Resend's dashboard — it logs every attempt and why it failed.
+**Emails never arrive, or registering says the letter could not be sent.** Without a verified
+domain Resend only delivers to **the address the Resend account itself was opened with**. Every
+other recipient is refused, which is why signing up works with your own address and appears to
+break with anyone else's — including a second address of your own.
+
+The account is still created when this happens: the server says so plainly rather than
+failing, and the reason is written to the API's log in full (`Could not send the verification
+email: …`). Resend's dashboard logs the same refusal from its side.
+
+The fix is a **verified domain** under **Domains** in Resend, which lifts the restriction
+entirely. Until then, register with the account's own address.
 
 **Emails land in spam.** Expected, and not a misconfiguration. `onboarding@resend.dev` is a
 shared sandbox sender used by thousands of developers, so it carries no sending reputation of

@@ -12,12 +12,23 @@ export interface AuthResponse {
   user: AuthUser
 }
 
+export interface SignupResult {
+  message: string
+  /**
+   * Whether the verification letter actually left the server. An account is created either
+   * way — a mail provider being unreachable or refusing the recipient does not undo the
+   * registration — so this is what decides whether the next screen promises a letter or
+   * admits none was sent.
+   */
+  delivered: boolean
+}
+
 export async function signup(
   email: string,
   username: string,
   password: string,
-): Promise<{ message: string }> {
-  const { data } = await api.post<{ message: string }>('/auth/signup', {
+): Promise<SignupResult> {
+  const { data } = await api.post<SignupResult>('/auth/signup', {
     email,
     username,
     password,

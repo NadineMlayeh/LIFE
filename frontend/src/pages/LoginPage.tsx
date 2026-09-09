@@ -284,6 +284,7 @@ function RegisterForm({ active }: { active: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [delivered, setDelivered] = useState(true);
 
   const handle = useHandleCheck(username);
 
@@ -307,7 +308,12 @@ function RegisterForm({ active }: { active: boolean }) {
 
     setSubmitting(true);
     try {
-      await authService.signup(email.trim(), username.trim(), password);
+      const result = await authService.signup(
+        email.trim(),
+        username.trim(),
+        password,
+      );
+      setDelivered(result.delivered);
       setSentTo(email.trim());
     } catch (err) {
       setError(getErrorMessage(err, "Could not begin your life."));
@@ -316,7 +322,7 @@ function RegisterForm({ active }: { active: boolean }) {
     }
   }
 
-  if (sentTo) return <LetterSent email={sentTo} />;
+  if (sentTo) return <LetterSent email={sentTo} delivered={delivered} />;
 
   // The two passwords sit side by side and the guidance lines only appear when they have
   // something to say. Four stacked fields each carrying a permanent hint made the card taller
@@ -439,8 +445,20 @@ function useHandleCheck(username: string) {
   return { state, note: undefined, tone: undefined } as const;
 }
 
-/** The moment after registering: a letter is on its way. */
-function LetterSent({ email }: { email: string }) {
+/**
+ * The moment after registering.
+ *
+ * Usually a letter is on its way. Occasionally the server could not post it — the account is
+ * made regardless, so this screen says which of the two happened rather than promising an
+ * email that is never going to arrive. The button below is the same either way.
+ */
+function LetterSent({
+  email,
+  delivered,
+}: {
+  email: string;
+  delivered: boolean;
+}) {
   const [notice, setNotice] = useState<string | null>(null);
 
   return (
@@ -454,14 +472,16 @@ function LetterSent({ email }: { email: string }) {
         className="mt-4 text-[15px] leading-relaxed"
         style={{ color: "#D6C29C" }}
       >
-        A letter is on its way to{" "}
+        {delivered ? "A letter is on its way to " : "Your account is made, but the letter to "}
         <span style={{ color: "#F4E9D2", overflowWrap: "anywhere" }}>
           {email}
         </span>
-        . Open it to unlock the door.
+        {delivered ? ". Open it to unlock the door." : " could not be sent."}
       </p>
       <p className="mt-2 text-[12px]" style={{ color: "#A8916B" }}>
-        It keeps for twenty-four hours &mdash; and it often lands in spam, so look there too.
+        {delivered
+          ? "It keeps for twenty-four hours — and it often lands in spam, so look there too."
+          : "Nothing is lost. Ask for it again below, and if it still will not go, the address may be one the mail service is not yet allowed to write to."}
       </p>
 
       {notice && (
