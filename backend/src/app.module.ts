@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { BooksModule } from './books/books.module.js';
 import { ChaptersModule } from './chapters/chapters.module.js';
 import { GalleryModule } from './gallery/gallery.module.js';
+import { HealthModule } from './health/health.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { MailboxModule } from './mailbox/mailbox.module.js';
 import { MapModule } from './map/map.module.js';
@@ -19,6 +20,7 @@ import { TimelineModule } from './timeline/timeline.module.js';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    HealthModule,
     MailModule,
     StorageModule,
     PrivacyModule,

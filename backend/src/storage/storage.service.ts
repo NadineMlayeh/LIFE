@@ -1,17 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Readable as NodeReadable } from 'node:stream';
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+/*
+  A **type-only** import, which disappears entirely when this compiles.
+
+  The AWS SDK costs a tenth of a second to load, and on a serverless host that is a tenth of a
+  second added to every cold start — paid by deployments that store photographs in the database
+  and never open a bucket at all. Loading it at the moment a bucket is first used, rather than
+  when the file is first read, means only the deployments that actually want it pay for it.
+*/
+import type { S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { Readable } from 'node:stream';
+
+type AwsSdk = typeof import('@aws-sdk/client-s3');
 
 /**
  * The single seam between LIFE and where the bytes of a photograph physically live.
@@ -60,31 +65,41 @@ export class StorageService {
     if (process.env.STORE_FILES_IN_DB === 'true') return true;
     return this.ephemeral && !this.bucket;
   }
-  private readonly client: S3Client | null;
+
+  /** The loaded SDK and its client, built at most once and only if a bucket is ever used. */
+  private aws: Promise<{ sdk: AwsSdk; client: S3Client }> | null = null;
 
   constructor(private readonly prisma: PrismaService) {
-    if (!this.bucket) {
-      this.client = null;
-
-      this.logger.log(
-        this.inDatabase
+    this.logger.log(
+      this.bucket
+        ? `Photographs are stored in bucket "${this.bucket}"`
+        : this.inDatabase
           ? 'Photographs are stored in the database'
           : 'Photographs are stored on local disk',
-      );
-      return;
-    }
+    );
+  }
 
-    this.client = new S3Client({
-      // R2 and most S3-compatibles need an explicit endpoint; real S3 does not.
-      endpoint: process.env.S3_ENDPOINT,
-      // R2 ignores regions but the SDK insists on one being present.
-      region: process.env.S3_REGION ?? 'auto',
-      credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? '',
-      },
-    });
-    this.logger.log(`Photographs are stored in bucket "${this.bucket}"`);
+  /**
+   * Loads the AWS SDK and opens a client, the first time one is actually needed.
+   *
+   * The promise is cached rather than the client, so two uploads arriving together share one
+   * load instead of racing to run two.
+   */
+  private loadAws(): Promise<{ sdk: AwsSdk; client: S3Client }> {
+    this.aws ??= import('@aws-sdk/client-s3').then((sdk) => ({
+      sdk,
+      client: new sdk.S3Client({
+        // R2 and most S3-compatibles need an explicit endpoint; real S3 does not.
+        endpoint: process.env.S3_ENDPOINT,
+        // R2 ignores regions but the SDK insists on one being present.
+        region: process.env.S3_REGION ?? 'auto',
+        credentials: {
+          accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',
+          secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? '',
+        },
+      }),
+    }));
+    return this.aws;
   }
 
   async saveFile(userId: string, folder: string, file: Express.Multer.File): Promise<string> {
@@ -92,9 +107,10 @@ export class StorageService {
     // and an attacker-chosen filename must never reach a path.
     const key = `${userId}/${folder}/${randomUUID()}${extname(file.originalname).toLowerCase()}`;
 
-    if (this.client && this.bucket) {
-      await this.client.send(
-        new PutObjectCommand({
+    if (this.bucket) {
+      const { sdk, client } = await this.loadAws();
+      await client.send(
+        new sdk.PutObjectCommand({
           Bucket: this.bucket,
           Key: key,
           Body: file.buffer,
@@ -134,10 +150,11 @@ export class StorageService {
    * API means every read is checked against the current privacy rules.
    */
   async getFileStream(storagePath: string): Promise<Readable | null> {
-    if (this.client && this.bucket) {
+    if (this.bucket) {
       try {
-        const result = await this.client.send(
-          new GetObjectCommand({ Bucket: this.bucket, Key: storagePath }),
+        const { sdk, client } = await this.loadAws();
+        const result = await client.send(
+          new sdk.GetObjectCommand({ Bucket: this.bucket, Key: storagePath }),
         );
         return (result.Body as Readable) ?? null;
       } catch {
@@ -165,10 +182,9 @@ export class StorageService {
   }
 
   async deleteFile(storagePath: string): Promise<void> {
-    if (this.client && this.bucket) {
-      await this.client.send(
-        new DeleteObjectCommand({ Bucket: this.bucket, Key: storagePath }),
-      );
+    if (this.bucket) {
+      const { sdk, client } = await this.loadAws();
+      await client.send(new sdk.DeleteObjectCommand({ Bucket: this.bucket, Key: storagePath }));
       return;
     }
 

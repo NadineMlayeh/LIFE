@@ -257,6 +257,46 @@ Both matter:
 
 ---
 
+## Speed, and the first visit after a quiet day
+
+Free hosting has no process running between requests and a database that sleeps when idle, so
+the first call after a lull pays to wake both. Three things are done about it, and one more is
+available if the numbers work out.
+
+**The cold start was halved.** The AWS SDK was being loaded on every boot by deployments that
+store photographs in the database and never open a bucket — and it drags a large dependency
+tree behind it. Loading it at the moment a bucket is first used instead took bootstrap from
+about 1,500 ms to about 730 ms, measured over repeated runs. Most of what remains is NestJS
+itself, which has to be there.
+
+**The wait was moved somewhere nobody is standing.** The frontend is static files on a CDN and
+appears immediately, so it calls `/health` the moment it mounts — before React has rendered
+anything, blocking nothing. The function boots and the database wakes while the login card is
+being read. Several seconds of human time pass between a page appearing and a password being
+submitted, and that is more than the cold start needs. `/health` runs `SELECT 1` deliberately:
+waking the function alone would leave the slower half asleep.
+
+**The room is fetched before it is asked for.** Three.js is code-split so the login card does
+not wait for ~360 KB. That is right for the first paint and wrong for the moment after, so the
+bundle is fetched during browser idle time. Entering the room then costs nothing.
+
+Together these mean a real visitor generally does not meet a cold start at all. It still exists;
+it is being spent while they read.
+
+### Keeping it awake permanently
+
+The remaining case is a visitor who lands and acts within a second or two. To cover that, ping
+`/health` on a schedule from something outside the host — **cron-job.org** or **UptimeRobot**,
+both free, every five minutes.
+
+**Check your Neon usage before leaving this running.** A free database is metered in compute
+hours, and a project that never sleeps burns the maximum the plan allows. Neon's dashboard has
+a usage meter; watch it for a few days. Running out mid-month stops the database entirely,
+which is a far worse outcome than a slow first request — so if it is close, ping less often, or
+only during the hours you expect people to visit.
+
+---
+
 ## Who has actually used it
 
 Two different questions, and they need two different answers.
