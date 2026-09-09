@@ -14,20 +14,28 @@ export class MailService {
 
       Locally this points at Mailpit, which accepts anything, needs no credentials and
       delivers nothing — every message is caught and readable at localhost:8025. In production
-      it points at a real provider (Resend, Postmark, anything with SMTP) and needs to
-      authenticate, which is what `SMTP_USER` decides between here.
+      it points at any provider that speaks SMTP, and needs to authenticate, which is what
+      `SMTP_USER` decides between here.
 
-      `ignoreTLS` is only safe for the local trap; against a real host the connection has to be
-      encrypted, since the password crosses it.
+      **Nothing above this line names a provider**, which is the point. Which service actually
+      carries the mail is four environment variables, so moving between them — or away from one
+      whose sending rules turn out not to suit — costs no code at all.
+
+      TLS is *required* whenever credentials are in play rather than merely preferred. Port 587
+      is plaintext until STARTTLS upgrades it, and a server that fails to offer the upgrade
+      would otherwise be handed the password in the clear. Better to fail the send.
     */
     const user = process.env.SMTP_USER;
     const authenticated = Boolean(user);
+    const port = Number(process.env.SMTP_PORT ?? 1025);
 
     this.transporter = createTransport({
       host: process.env.SMTP_HOST ?? 'localhost',
-      port: Number(process.env.SMTP_PORT ?? 1025),
-      secure: Number(process.env.SMTP_PORT ?? 1025) === 465,
+      port,
+      // 465 is TLS from the first byte; 587 starts plain and upgrades.
+      secure: port === 465,
       ignoreTLS: !authenticated,
+      requireTLS: authenticated && port !== 465,
       ...(authenticated
         ? { auth: { user, pass: process.env.SMTP_PASS ?? '' } }
         : {}),

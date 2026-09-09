@@ -192,7 +192,7 @@ Motion · React Router · axios
 NestJS 12 · TypeScript (ESM) · Prisma 6 · PostgreSQL · Passport JWT · bcryptjs · Nodemailer
 
 **Infrastructure**
-Vercel (frontend and serverless API) · Neon (Postgres) · Resend (email) ·
+Vercel (frontend and serverless API) · Neon (Postgres) · SMTP, provider-agnostic ·
 photograph storage in the database or any S3-compatible bucket ·
 Docker Compose and Mailpit for local development
 

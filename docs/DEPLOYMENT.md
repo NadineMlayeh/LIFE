@@ -13,7 +13,7 @@ free plans these services actually intend people to stay on.
 | API | **Vercel Functions** | Same project type. No server sitting idle, so nothing to pay for and nothing to spin down. |
 | Database | **Neon** | Free Postgres. See below — this is the choice that matters most. |
 | Photographs | **The database**, or Cloudflare R2 | See step 2 — R2 is better, but asks for a card. |
-| Email | **Resend** | 3,000 emails a month free, permanently. |
+| Email | **Any SMTP provider** | Four environment variables, no code. See step 3 for free ones that will write to strangers. |
 
 ### Why Neon and not Supabase
 
@@ -110,15 +110,66 @@ has a single seam, and which side of it is in use is decided entirely by configu
 
 ---
 
-## 3. Email — Resend
+## 3. Email
 
-1. Sign up at **resend.com**.
-2. Without a domain you can send from `onboarding@resend.dev`, but **only to your own address**.
-   That is enough to prove it works. To send to anyone, add a domain under **Domains** and
-   follow the DNS records.
-3. **API Keys** → create one. Copy it.
+The application speaks plain SMTP and **names no provider anywhere in its code**. Which service
+carries the mail is four environment variables, so this is a decision you can change later for
+free.
 
-SMTP settings: host `smtp.resend.com`, port `587`, user `resend`, password = the API key.
+### The one thing to get right
+
+Anyone can send mail to *themselves* on a free tier. The question that actually matters is
+whether a provider will deliver to **someone else** — a recruiter registering an account —
+without owning a domain first.
+
+Providers verify a sender in one of two ways, and the difference decides everything:
+
+- **Domain verification** — prove you own `yourname.com` via DNS records. The domain costs
+  money. Resend and Postmark work this way; until you do it they will only write to the address
+  the account was opened with, and every other recipient is refused.
+- **Single-sender verification** — prove you control one *email address* by clicking a link
+  sent to it. Free, instant, no domain. This is what you want.
+
+### Gmail SMTP — recommended
+
+No new account, no card, no domain, and 500 recipients a day.
+
+It is also the only free option with no deliverability catch. Sending mail that claims to come
+from a Gmail address is normally treated as forgery by every receiving server — but here it is
+Google itself doing the sending, so it passes its own checks. Any other relay claiming a
+`@gmail.com` sender is what lands in spam.
+
+1. The account needs **2-Step Verification** on: Google Account → **Security**.
+2. Then open **App passwords** (search for it in Google Account settings). Create one, named
+   anything. Google shows a **16-character password once** — copy it. It is not your Gmail
+   password, and it can be revoked on its own without touching the account.
+3. Settings: host `smtp.gmail.com`, port `587`, user = the full Gmail address, password = the
+   16-character app password.
+
+Use a separate Gmail if you would rather your personal address not appear as the sender.
+`MAIL_FROM` must be **that same address** — Gmail rewrites anything else, so a mismatch is
+silently ignored rather than honoured.
+
+### Brevo — if you would rather not use a Gmail account
+
+Free permanently, 300 emails a day, no card. Sign up at **brevo.com**, add your address under
+**Senders** and click the link it emails you, then take the SMTP key from **SMTP & API**.
+
+Settings: host `smtp-relay.brevo.com`, port `587`, user = your Brevo login email, password =
+the SMTP key.
+
+The sender should ideally not be an `@gmail.com` address here — Brevo is not Google, so mail
+claiming to come from Gmail is treated with suspicion by receiving servers. Fine for a demo,
+worth knowing.
+
+### Resend — only once you own a domain
+
+3,000 emails a month, and the nicest of the three to work with, but domain-verified only:
+`onboarding@resend.dev` reaches **the address the Resend account was opened with and nobody
+else**. Good enough to prove the plumbing works; not good enough for a site strangers sign up
+to. If you buy a domain later, this is the one to move to.
+
+Host `smtp.resend.com`, port `587`, user `resend`, password = the API key.
 
 ---
 
@@ -135,11 +186,11 @@ SMTP settings: host `smtp.resend.com`, port `587`, user `resend`, password = the
    | `JWT_EXPIRES_IN` | `7d` |
    | `APP_URL` | Your frontend URL (fill in after step 5, then redeploy) |
    | `FRONTEND_URL` | The same |
-   | `SMTP_HOST` | `smtp.resend.com` |
+   | `SMTP_HOST` | `smtp.gmail.com` |
    | `SMTP_PORT` | `587` |
-   | `SMTP_USER` | `resend` |
-   | `SMTP_PASS` | Your Resend API key |
-   | `MAIL_FROM` | `LIFE <onboarding@resend.dev>` |
+   | `SMTP_USER` | Your full Gmail address |
+   | `SMTP_PASS` | The 16-character app password |
+   | `MAIL_FROM` | `LIFE <the-same-gmail-address>` |
 
    Then **either** (option A):
 
@@ -194,9 +245,10 @@ Both matter:
 ## Checking it worked
 
 1. Open the frontend. The auth doors should appear.
-2. Register **with the address your Resend account uses**. Any other recipient is refused
-   until a domain is verified. The email arriving proves Resend, `APP_URL` and the database
-   are all correct at once.
+2. Register with an address that is **not** the sending account's own — a second address of
+   yours, or a friend's. Delivering to yourself proves almost nothing; delivering to somebody
+   else is the thing that has to work, and it proves the mail provider, `APP_URL` and the
+   database are all correct at once.
 3. Verify, log in, and open the room.
 4. Upload a photograph and reload. If it survives, R2 is wired correctly. *This is the one to
    test properly*: with storage misconfigured the upload appears to succeed and the image is
@@ -210,25 +262,25 @@ Both matter:
 **Every request fails with a CORS error.** `FRONTEND_URL` on the API does not exactly match the
 frontend's origin. No trailing slash.
 
-**Emails never arrive, or registering says the letter could not be sent.** Without a verified
-domain Resend only delivers to **the address the Resend account itself was opened with**. Every
-other recipient is refused, which is why signing up works with your own address and appears to
-break with anyone else's — including a second address of your own.
+**Registering says the letter could not be sent, or it arrives for you and nobody else.** The
+provider is refusing the recipient. Almost always this means a **domain-verified** provider is
+in use without a domain — see step 3, and switch to a single-sender one, which is four
+environment variables and a redeploy.
 
-The account is still created when this happens: the server says so plainly rather than
-failing, and the reason is written to the API's log in full (`Could not send the verification
-email: …`). Resend's dashboard logs the same refusal from its side.
+The account is still created either way: the server says so plainly rather than failing, and
+the reason is written to the API's log in full (`Could not send the verification email: …`).
+That log line is the fastest way to tell a refused recipient from a wrong password.
 
-The fix is a **verified domain** under **Domains** in Resend, which lifts the restriction
-entirely. Until then, register with the account's own address.
+**Mail sends, but lands in spam.** Start with what `MAIL_FROM` claims. A `@gmail.com` sender is
+only trustworthy when Gmail is the one sending — routed through any other provider it is
+treated as forgery, because that is precisely what forgery looks like. Gmail's own SMTP is
+therefore the free option least likely to be filtered.
 
-**Emails land in spam.** Expected, and not a misconfiguration. `onboarding@resend.dev` is a
-shared sandbox sender used by thousands of developers, so it carries no sending reputation of
-its own, and mailbox providers treat it accordingly.
-
-The fix is a **verified domain in Resend**, which publishes the SPF and DKIM records that
-prove the mail genuinely originates where it claims to. A custom domain also gives the
-application a better address than the host's generated one.
+A shared sandbox sender such as `onboarding@resend.dev` is the other common cause: thousands of
+developers send from it, so it carries no reputation of its own and mailbox providers treat it
+accordingly. Neither case is a misconfiguration exactly, and the full fix is the same one — a
+verified domain, which publishes the SPF and DKIM records that prove the mail originates where
+it claims.
 
 Until then the interface says so plainly: the screen shown after signing up directs people to
 their spam folder, as do the resend notice and the password-reset screen. A letter that appears
@@ -277,7 +329,8 @@ Nothing, at this scale. The limits you would hit first, in order:
 
 1. **Photograph storage** — 10 GB on R2 (around 30,000 photographs), or the database's 0.5 GB
    (around 1,500). Uploads are compressed in the browser to roughly 300 KB.
-2. **Resend** — 3,000 emails a month. Only sent on signup and password reset.
+2. **Email** — 500 recipients a day through Gmail, 300 through Brevo, 3,000 a month on
+   Resend. Only sent on signup and password reset, so this is a long way off.
 3. **Neon** — 0.5 GB of database. Text is small; this is a long way off.
 4. **Vercel** — 100 GB of bandwidth a month.
 
