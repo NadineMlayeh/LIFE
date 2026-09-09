@@ -283,14 +283,8 @@ function Album({
   // uncovered.
   function renderPage(pageIndex: number) {
     const photo = photos[pageIndex]
-    if (!photo) {
-      // A book ends on a blank leaf rather than a gap, and the very first one says so.
-      return photos.length === 0 && pageIndex === 0 ? (
-        <p className="py-12 text-center text-[13px] italic text-[var(--ink-faint)]">
-          The album is empty. Mount your first photograph below.
-        </p>
-      ) : null
-    }
+    // A leaf past the last photograph is simply blank, the way the back of a real album is.
+    if (!photo) return null
     return (
       <Print
         photo={photo}
@@ -302,13 +296,31 @@ function Album({
   }
 
   return (
-    <div>
-      <PageTurn leaf={leaf} direction={direction} renderPage={renderPage} />
+    <div className="flex h-full flex-col">
+      {/*
+        An empty album is not a spread with nothing on it — it is a book that has not been
+        started. Rendering it through the page turn left a gutter down the middle of an empty
+        sheet and a stranded line of text in one half, which read as a layout fault rather than
+        as an invitation.
+      */}
+      {photos.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
+          <Corners />
+          <p className="mt-5 text-[15px] italic text-[var(--ink-soft)]">
+            The album is empty.
+          </p>
+          <p className="mt-1 text-[13px] text-[var(--ink-faint)]">
+            Mount your first photograph and it will hang in the frame on your wall.
+          </p>
+        </div>
+      ) : (
+        <PageTurn leaf={leaf} direction={direction} renderPage={renderPage} />
+      )}
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-4"
         style={{ borderColor: 'var(--rule)' }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ visibility: photos.length ? 'visible' : 'hidden' }}>
           <button
             onClick={() => onTurn(leaf - 1)}
             disabled={leaf === 0}
@@ -402,6 +414,22 @@ function Print({
         </div>
       </figcaption>
     </figure>
+  )
+}
+
+/** An empty mount: the corners with nothing between them. */
+function Corners() {
+  return (
+    <div
+      className="relative"
+      style={{
+        width: 'min(38vw, 15rem)',
+        height: 'min(26vh, 11rem)',
+        border: '1px dashed rgba(122,91,38,0.32)',
+      }}
+    >
+      <PhotoCorners />
+    </div>
   )
 }
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { Readable as NodeReadable } from 'node:stream';
 import {
   DeleteObjectCommand,
@@ -43,14 +43,31 @@ export class StorageService {
   private readonly inDatabase = process.env.STORE_FILES_IN_DB === 'true';
   private readonly client: S3Client | null;
 
+  /**
+   * True on a host with no writable filesystem. Vercel sets `VERCEL`; most platforms set
+   * `NODE_ENV=production`. Either way, writing a file to disk there is not merely a bad idea —
+   * it fails, and it fails at upload time rather than at deploy time.
+   */
+  private readonly ephemeral =
+    process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+
   constructor(private readonly prisma: PrismaService) {
     if (!this.bucket) {
       this.client = null;
-      this.logger.log(
-        this.inDatabase
-          ? 'Photographs are stored in the database'
-          : 'Photographs are stored on local disk',
-      );
+
+      if (this.inDatabase) {
+        this.logger.log('Photographs are stored in the database');
+      } else if (this.ephemeral) {
+        // Loud, once, at startup — so the cause is in the deployment log rather than only
+        // showing up later as an unexplained 500 on the first upload.
+        this.logger.error(
+          'No photograph storage is configured. Set STORE_FILES_IN_DB=true, or the S3_* ' +
+            'variables for a bucket. This host has no writable filesystem, so uploads will ' +
+            'fail until one of those is set.',
+        );
+      } else {
+        this.logger.log('Photographs are stored on local disk');
+      }
       return;
     }
 
@@ -97,6 +114,13 @@ export class StorageService {
         },
       });
       return key;
+    }
+
+    if (this.ephemeral) {
+      // Better a clear message than an EROFS stack trace the caller sees as a bare 500.
+      throw new ServiceUnavailableException(
+        'Photograph storage is not configured on this server.',
+      );
     }
 
     const directory = join(this.root, userId, folder);
