@@ -94,7 +94,9 @@ ever saw it keeps access forever, whatever you later decide.
 
 ### Option B — store them in the database (no card, no extra account)
 
-Set `STORE_FILES_IN_DB=true` and leave `S3_BUCKET` empty. That is the whole setup.
+**Nothing to set.** With no bucket configured, a host that has no writable filesystem stores
+photographs in the database automatically. `STORE_FILES_IN_DB=true` exists to force the same
+behaviour locally, where the disk *is* writable.
 
 Files in a database are not the ideal arrangement: backups grow larger and reads are heavier
 than they would be against a bucket. At this scale it is nonetheless entirely workable, and a

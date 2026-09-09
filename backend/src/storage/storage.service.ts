@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Readable as NodeReadable } from 'node:stream';
 import {
   DeleteObjectCommand,
@@ -40,34 +40,37 @@ export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly root = resolve(process.env.UPLOAD_DIR ?? 'uploads');
   private readonly bucket = process.env.S3_BUCKET;
-  private readonly inDatabase = process.env.STORE_FILES_IN_DB === 'true';
-  private readonly client: S3Client | null;
-
   /**
    * True on a host with no writable filesystem. Vercel sets `VERCEL`; most platforms set
-   * `NODE_ENV=production`. Either way, writing a file to disk there is not merely a bad idea —
-   * it fails, and it fails at upload time rather than at deploy time.
+   * `NODE_ENV=production`. Writing a file to disk there does not merely go against the grain —
+   * it throws, and it throws at upload time rather than at deploy time.
    */
   private readonly ephemeral =
     process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+  /**
+   * Store the bytes in Postgres.
+   *
+   * Set explicitly by `STORE_FILES_IN_DB`, but also **assumed automatically** on a host with no
+   * writable filesystem and no bucket configured. There is no situation in which refusing the
+   * upload is more useful than simply storing it somewhere that works, and requiring a
+   * variable to be set correctly before uploads function at all is a trap rather than a
+   * safeguard.
+   */
+  private get inDatabase(): boolean {
+    if (process.env.STORE_FILES_IN_DB === 'true') return true;
+    return this.ephemeral && !this.bucket;
+  }
+  private readonly client: S3Client | null;
 
   constructor(private readonly prisma: PrismaService) {
     if (!this.bucket) {
       this.client = null;
 
-      if (this.inDatabase) {
-        this.logger.log('Photographs are stored in the database');
-      } else if (this.ephemeral) {
-        // Loud, once, at startup — so the cause is in the deployment log rather than only
-        // showing up later as an unexplained 500 on the first upload.
-        this.logger.error(
-          'No photograph storage is configured. Set STORE_FILES_IN_DB=true, or the S3_* ' +
-            'variables for a bucket. This host has no writable filesystem, so uploads will ' +
-            'fail until one of those is set.',
-        );
-      } else {
-        this.logger.log('Photographs are stored on local disk');
-      }
+      this.logger.log(
+        this.inDatabase
+          ? 'Photographs are stored in the database'
+          : 'Photographs are stored on local disk',
+      );
       return;
     }
 
@@ -114,13 +117,6 @@ export class StorageService {
         },
       });
       return key;
-    }
-
-    if (this.ephemeral) {
-      // Better a clear message than an EROFS stack trace the caller sees as a bare 500.
-      throw new ServiceUnavailableException(
-        'Photograph storage is not configured on this server.',
-      );
     }
 
     const directory = join(this.root, userId, folder);
