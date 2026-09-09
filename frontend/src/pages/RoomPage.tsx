@@ -41,11 +41,21 @@ export function RoomPage() {
   // Which document is open on top of the room. The room is never unmounted.
   const [panel, setPanel] = useState<'identity' | 'timeline' | 'library' | 'gallery' | 'map' | 'mailbox' | null>(null)
 
-  // The 3D room is the shell, never the only way in. Small screens get the plain UI, which is
-  // fully capable on its own.
+  /**
+   * The room is drawn for a desktop display: it wants a wide viewport and a pointer to look
+   * around with. A narrow screen therefore gets a warning first — but a warning, not a wall.
+   *
+   * It used to be a wall, and it led nowhere: the button pointed at a plain interface that has
+   * since been removed, so the route fell through to the catch-all, which sent it back here,
+   * which showed the same screen again. Anyone arriving on a phone was stuck in a loop with no
+   * way forward and nothing explaining why.
+   *
+   * Someone who has come this far should be able to look anyway and judge for themselves.
+   */
   const [smallScreen, setSmallScreen] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 900,
   )
+  const [ignoreScreenSize, setIgnoreScreenSize] = useState(false)
 
   useEffect(() => {
     const onResize = () => setSmallScreen(window.innerWidth < 900)
@@ -98,19 +108,22 @@ export function RoomPage() {
 
   const lighting = lightingForDate()
 
-  if (smallScreen) {
+  if (smallScreen && !ignoreScreenSize) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-6">
+      <div className="flex min-h-screen items-center justify-center bg-[#EFE2CE] px-6">
         <div className="max-w-sm text-center">
-          <h1 className="text-xl font-semibold text-neutral-900">Your room needs a bigger screen</h1>
-          <p className="mt-2 text-sm text-neutral-500">
-            The room is built for a desktop display. Everything in it is available here too.
+          <h1 className="text-[22px] font-semibold tracking-wide text-[#4A3520]">
+            This room was built for a wider window
+          </h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-[#7A5233]">
+            It is a three-dimensional space you look around with a cursor, and a phone gives it
+            neither the width nor the pointer. On a laptop it opens properly.
           </p>
           <button
-            onClick={() => navigate('/dashboard')}
-            className="mt-6 rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+            onClick={() => setIgnoreScreenSize(true)}
+            className="mt-6 rounded border border-[#A8863C] px-5 py-2 text-[13px] tracking-wide text-[#5C4322] transition-colors hover:bg-[#A8863C]/15"
           >
-            Continue to LIFE
+            Show me anyway
           </button>
         </div>
       </div>
@@ -131,10 +144,10 @@ export function RoomPage() {
         <div className="max-w-sm text-center">
           <p className="text-sm text-red-600">{error}</p>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => window.location.reload()}
             className="mt-4 rounded border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
           >
-            Go to the plain view
+            Try again
           </button>
         </div>
       </div>

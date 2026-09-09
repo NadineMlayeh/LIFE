@@ -4,7 +4,20 @@ import { StorageService } from '../storage/storage.service.js';
 import { UpdatePhotoDto } from './dto/photo.dto.js';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_BYTES = 5 * 1024 * 1024;
+/*
+  Four megabytes, not five, and the number is not arbitrary.
+
+  A serverless request body is capped by the platform — Vercel's limit is 4.5 MB — and that cap
+  is enforced before any of this code runs, so a file between the two limits would be rejected
+  by the host with an opaque error instead of by us with a sentence saying what was wrong.
+  Staying underneath means every refusal is one we can explain.
+
+  The browser compresses to a few hundred kilobytes before uploading, so this is a backstop for
+  the API being called directly, and for the one format compression declines to touch: an
+  animated GIF is passed through untouched, since re-encoding it to JPEG would flatten it to a
+  single frame.
+*/
+const MAX_BYTES = 4 * 1024 * 1024;
 
 @Injectable()
 export class GalleryService {
@@ -28,7 +41,7 @@ export class GalleryService {
       throw new BadRequestException('Only JPEG, PNG, WebP and GIF images are allowed');
     }
     if (file.size > MAX_BYTES) {
-      throw new BadRequestException('Image is larger than 5 MB');
+      throw new BadRequestException('Image is larger than 4 MB');
     }
 
     const storagePath = await this.storage.saveFile(userId, 'gallery', file);

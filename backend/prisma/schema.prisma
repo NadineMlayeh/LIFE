@@ -33,6 +33,13 @@ model User {
   passwordHash  String
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
+  // When this account last got through the door, and how many times it ever has.
+  //
+  // Not a feature anybody sees. It is the only way to tell a registration that became a person
+  // looking around from one that was abandoned at the verification email — which is the
+  // difference between a demo that works for strangers and one that merely appears to.
+  lastLoginAt   DateTime?
+  loginCount    Int      @default(0)
 
   verificationTokens EmailVerificationToken[]
   passwordResets     PasswordResetToken[]

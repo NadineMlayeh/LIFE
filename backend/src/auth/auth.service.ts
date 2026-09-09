@@ -158,6 +158,21 @@ export class AuthService {
       throw new ForbiddenException('Please verify your email address before logging in');
     }
 
+    /*
+      Recorded only once the login has actually succeeded, so a wrong password never looks like
+      a visit. Deliberately not awaited as part of the response: a bookkeeping write failing is
+      no reason to refuse someone entry to their own account.
+    */
+    this.prisma.user
+      .update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
+      })
+      .catch((error: unknown) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Could not record the login: ${reason}`);
+      });
+
     return {
       accessToken: this.jwtService.sign({ sub: user.id, email: user.email }),
       user: { id: user.id, email: user.email, username: user.username },

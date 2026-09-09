@@ -257,6 +257,39 @@ Both matter:
 
 ---
 
+## Who has actually used it
+
+Two different questions, and they need two different answers.
+
+**How many people looked?** Turn on **Web Analytics** in the Vercel project (Analytics tab, one
+click, free on the Hobby plan). Visitors, page views and referrers — so a spike from a posted
+link is visible as a spike.
+
+**Who got as far as an account?** That is in the database. Neon's dashboard has a **SQL Editor**;
+this is the whole report:
+
+```sql
+SELECT username,
+       email,
+       "createdAt"    AS registered,
+       "emailVerified" AS verified,
+       "lastLoginAt"  AS last_seen,
+       "loginCount"   AS logins
+FROM "User"
+ORDER BY "createdAt" DESC;
+```
+
+The columns that matter are the last three. `verified = false` means the verification email
+never got clicked — if that is *everybody*, the mail provider is refusing recipients rather
+than people losing interest, and step 3 is the place to look. `logins = 0` on a verified
+account means someone confirmed their address and never came back. A row with several logins
+is a person who actually looked around.
+
+Failed attempts are not counted: the record is written only after a login succeeds, so a
+mistyped password never reads as a visit.
+
+---
+
 ## If something goes wrong
 
 **Every request fails with a CORS error.** `FRONTEND_URL` on the API does not exactly match the
