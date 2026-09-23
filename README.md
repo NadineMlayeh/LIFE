@@ -9,12 +9,9 @@ been, a frame for your photographs, and a post box outside for letters to other 
 
 Nothing is filed in a menu. You open the thing itself.
 
-> **Live:** _add your deployed URL here_
-> **Tour:** the app introduces itself on first login, and the tour can be replayed any time.
-
-
 🚪 Discover and step into my LIFE world, no signup, just open the door:
 https://lnkd.in/e_GBGVKE
+
 🔗 Live demo — create your own account and make the room yours:
 https://lnkd.in/eZzGy852
 
