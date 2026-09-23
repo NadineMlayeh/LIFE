@@ -10,10 +10,10 @@ been, a frame for your photographs, and a post box outside for letters to other 
 Nothing is filed in a menu. You open the thing itself.
 
 🚪 Discover and step into my LIFE world, no signup, just open the door:
-https://life-app-sage.vercel.app/share/2c80616dc5fb131696b6a94b3b5823fbd40af9acb0025ca1b27479112280b0ef
+[View Live Room](https://life-app-sage.vercel.app/share/2c80616dc5fb131696b6a94b3b5823fbd40af9acb0025ca1b27479112280b0ef)
 
 🔗 Live demo — create your own account and make the room yours:
-https://life-app-sage.vercel.app/login
+[Create your account](https://life-app-sage.vercel.app/login)
 
 
 ---
